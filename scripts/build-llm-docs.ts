@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { glob } from 'node:fs/promises'
+import { glob } from 'glob'
 
 const frontmatterRegex = /^\n*---(\n.+)*?\n---\n/
 
@@ -28,7 +28,7 @@ async function generateLLMDocs() {
 
   const optionals: string[] = []
 
-  for await (const file of optionalFiles) {
+  for (const file of optionalFiles) {
     optionals.push(
       `- [${capitalizeDelimiter(extractLabel(file)).replace(/-/, ' ')}](https://hono.dev/docs/${sliceExt(file)})`
     )
@@ -73,10 +73,9 @@ async function generateLLMDocs() {
   const outputTinyFile = path.resolve('public/llms-small.txt')
 
   const tinyExclude = ['concepts', 'helpers', 'middleware']
-  const tinyFiles = await glob('**/*.md', {
+  const tinyFiles = (await glob('**/*.md', {
     cwd: docsDir,
-    exclude: (filename: string) => tinyExclude.includes(filename),
-  })
+  })).filter((filename: string) => !tinyExclude.some(exclude => filename.includes(exclude)))
 
   const tinyContent = await generateContent(
     tinyFiles,
@@ -89,13 +88,13 @@ async function generateLLMDocs() {
 }
 
 async function generateContent(
-  files: NodeJS.AsyncIterator<string>,
+  files: string[],
   docsDir: string,
   header: string
 ): Promise<string> {
   let content = header + '# Start of Hono documentation\n'
 
-  for await (const file of files) {
+  for (const file of files) {
     console.log(`> Writing '${file}' `)
     const fileContent = fs.readFileSync(
       path.resolve(docsDir, file),

@@ -1,302 +1,292 @@
-# Routing
+# Routing Specification
 
-Routing of Hono is flexible and intuitive.
-Let's take a look.
+This document provides a comprehensive specification for Hono's routing system, including path patterns, matching rules, and priority behavior.
 
-## Basic
+## Path Pattern Syntax
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-// HTTP Methods
-app.get('/', (c) => c.text('GET /'))
-app.post('/', (c) => c.text('POST /'))
-app.put('/', (c) => c.text('PUT /'))
-app.delete('/', (c) => c.text('DELETE /'))
+### Static Paths
 
-// Wildcard
-app.get('/wild/*/card', (c) => {
-  return c.text('GET /wild/*/card')
-})
+Static paths match exactly as written.
 
-// Any HTTP methods
-app.all('/hello', (c) => c.text('Any Method /hello'))
+**Format:** `/exact/path`
 
-// Custom HTTP method
-app.on('PURGE', '/cache', (c) => c.text('PURGE Method /cache'))
+**Matching Rules:**
+- Exact string comparison
+- Case-sensitive matching
+- No parameter capture
 
-// Multiple Method
-app.on(['PUT', 'DELETE'], '/post', (c) =>
-  c.text('PUT or DELETE /post')
-)
+**Examples:**
+- `/` - Root path
+- `/users` - Static path segment
+- `/api/v1/status` - Multi-segment static path
 
-// Multiple Paths
-app.on('GET', ['/hello', '/ja/hello', '/en/hello'], (c) =>
-  c.text('Hello')
-)
+### Named Parameters
+
+Named parameters capture path segments for dynamic routing.
+
+**Format:** `/:paramName`
+
+**Type:** `string` (captured segment value)
+
+**Matching Rules:**
+- Matches any non-empty path segment
+- Captured value is URL-decoded
+- Accessible via `c.req.param(paramName)`
+
+**Constraints:**
+- Parameter names must be valid JavaScript identifiers
+- Cannot contain `/` character
+- Cannot be empty
+
+### Optional Parameters
+
+Parameters that may or may not be present in the path.
+
+**Format:** `/:paramName?`
+
+**Matching Rules:**
+- Matches path with or without the parameter segment
+- Parameter value is `undefined` when segment is missing
+- Trailing segments after optional parameter still must match
+
+**Behavior:**
+- `/api/animal/:type?` matches both `/api/animal` and `/api/animal/dog`
+- When missing, `c.req.param('type')` returns `undefined`
+
+### Wildcard Paths
+
+Wildcard segments match any single path segment.
+
+**Format:** `/path/*/segment`
+
+**Matching Rules:**
+- `*` matches exactly one non-empty path segment
+- Does not capture the matched value
+- Cannot be accessed via `c.req.param()`
+
+**Limitations:**
+- Cannot appear at the end of a path pattern
+- Cannot be used within a segment (e.g., `/*abc` is invalid)
+
+### Regular Expression Constraints
+
+Parameters can be constrained using regular expressions.
+
+**Format:** `/:paramName{regexPattern}`
+
+**Matching Rules:**
+- Parameter must match the provided regular expression
+- Full parameter value must match (anchored match)
+- Standard JavaScript RegExp syntax
+
+**Examples:**
+- `/:id{[0-9]+}` - Numeric ID only
+- `/:slug{[a-zA-Z0-9-]+}` - Alphanumeric with hyphens
+- `/:filename{.+\\.png}` - Filename ending with .png (may include slashes)
+
+**Notes:**
+- Regex patterns are not automatically anchored
+- Use `^` and `$` if needed, though full match is enforced
+- Complex patterns may impact routing performance
+
+## Route Matching Algorithm
+
+### Matching Process
+
+1. **Path Extraction**: Extract path from request URL using `getPath` function
+2. **Route Iteration**: Test routes in registration order
+3. **Pattern Matching**: Apply pattern matching rules for each route
+4. **First Match Wins**: Execute first matching route's handlers
+
+### Priority Rules
+
+**Registration Order Priority:**
+Routes are matched in the order they were registered (first match wins).
+
+**Pattern Specificity:**
+When routes are registered in the same order:
+1. Static paths (exact matches)
+2. Constrained parameters (regex patterns)  
+3. Named parameters (unconstrained)
+4. Optional parameters
+5. Wildcard patterns
+
+### Trailing Slash Behavior
+
+Controlled by the `strict` constructor option:
+
+**Strict Mode (`strict: true` - default):**
+- `/hello` and `/hello/` are different routes
+- Must match exactly as registered
+- No automatic normalization
+
+**Non-Strict Mode (`strict: false`):**
+- `/hello` and `/hello/` are treated as equivalent
+- Automatic trailing slash normalization
+- More flexible matching
+
+## Route Registration Methods
+
+### HTTP Method Registration
+
+All HTTP method functions follow the same signature:
+
+**Signature:**
+```ts
+get|post|put|delete|head|options|patch(
+  path: string,
+  ...handlers: Handler[]
+): Hono
 ```
 
-## Path Parameter
+**Behavior:**
+- Registers route for specific HTTP method
+- Supports method chaining
+- Multiple handlers execute in order
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/user/:name', async (c) => {
-  const name = c.req.param('name')
-  //       ^?
-  // ...
-})
+### Universal Method Registration
+
+#### `all(path, ...handlers)`
+
+**Signature:**
+```ts
+all(path: string, ...handlers: Handler[]): Hono
 ```
 
-or all parameters at once:
+**Behavior:**
+- Matches any HTTP method for the given path
+- Executes for GET, POST, PUT, DELETE, etc.
+- Useful for universal middleware or handlers
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/posts/:id/comment/:comment_id', async (c) => {
-  const { id, comment_id } = c.req.param()
-  //       ^?
-  // ...
-})
+#### `on(method, path, ...handlers)`
+
+**Signature:**
+```ts
+on(
+  method: string | string[],
+  path: string | string[],
+  ...handlers: Handler[]
+): Hono
 ```
 
-## Optional Parameter
+**Behavior:**
+- Custom method(s) and path(s) registration
+- Supports arrays for multiple methods or paths
+- Cartesian product matching (each method × each path)
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-// Will match `/api/animal` and `/api/animal/:type`
-app.get('/api/animal/:type?', (c) => c.text('Animal!'))
+## Route Group Management
+
+### Sub-Application Mounting
+
+#### `route(path, app)`
+
+**Signature:**
+```ts
+route(path: string, app: Hono): Hono
 ```
 
-## Regexp
+**Behavior:**
+- Mounts all routes from `app` under `path` prefix
+- Preserves middleware and error handlers from sub-app
+- Sub-app routes become relative to mount path
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/post/:date{[0-9]+}/:title{[a-z]+}', async (c) => {
-  const { date, title } = c.req.param()
-  //       ^?
-  // ...
-})
+**Requirements:**
+- `path` must start with `/`
+- `app` must be a valid Hono instance
+- Sub-app should be fully configured before mounting
+
+### Base Path Configuration
+
+#### `basePath(path)`
+
+**Signature:**
+```ts
+basePath(path: string): Hono
 ```
 
-## Including slashes
+**Behavior:**
+- Returns new Hono instance with base path applied
+- All subsequent routes are automatically prefixed
+- Original instance remains unchanged
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/posts/:filename{.+\\.png}', async (c) => {
-  //...
-})
+**Requirements:**
+- `path` must start with `/`
+- `path` must not end with `/` (except for root `/`)
+
+## Custom Path Extraction
+
+### `getPath` Function
+
+**Signature:**
+```ts
+getPath?: (request: Request) => string
 ```
 
-## Chained route
+**Purpose:**
+- Override default URL pathname extraction
+- Enable hostname-based routing
+- Support custom routing logic
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app
-  .get('/endpoint', (c) => {
-    return c.text('GET /endpoint')
-  })
-  .post((c) => {
-    return c.text('POST /endpoint')
-  })
-  .delete((c) => {
-    return c.text('DELETE /endpoint')
-  })
-```
+**Requirements:**
+- Must return a valid path string starting with `/`
+- Should handle all expected request formats
+- Performance-critical (called for every request)
 
-## Grouping
+**Common Patterns:**
+- Hostname integration: Include hostname in routing path
+- Header-based routing: Use headers for route determination
+- Protocol handling: Different routing based on HTTP vs HTTPS
 
-You can group the routes with the Hono instance and add them to the main app with the route method.
+## Performance Characteristics
 
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const book = new Hono()
+### Router-Specific Behavior
 
-book.get('/', (c) => c.text('List Books')) // GET /book
-book.get('/:id', (c) => {
-  // GET /book/:id
-  const id = c.req.param('id')
-  return c.text('Get Book: ' + id)
-})
-book.post('/', (c) => c.text('Create Book')) // POST /book
+Different routers have different performance characteristics for pattern matching:
 
-const app = new Hono()
-app.route('/book', book)
-```
+- **RegExpRouter**: O(1) for simple patterns, compiled to single regex
+- **TrieRouter**: O(log n) lookup with tree traversal
+- **LinearRouter**: O(n) linear search through all routes
+- **PatternRouter**: O(n) simplified pattern matching
+- **SmartRouter**: Automatically selects optimal router
 
-## Grouping without changing base
+### Optimization Guidelines
 
-You can also group multiple instances while keeping base.
+1. **Register specific routes first**: Static paths before parameterized
+2. **Minimize regex complexity**: Simple patterns perform better
+3. **Use appropriate router**: Match router to route complexity
+4. **Limit route count**: Fewer routes generally perform better
 
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const book = new Hono()
-book.get('/book', (c) => c.text('List Books')) // GET /book
-book.post('/book', (c) => c.text('Create Book')) // POST /book
+## Caveats and Limitations
 
-const user = new Hono().basePath('/user')
-user.get('/', (c) => c.text('List Users')) // GET /user
-user.post('/', (c) => c.text('Create User')) // POST /user
+### Pattern Limitations
 
-const app = new Hono()
-app.route('/', book) // Handle /book
-app.route('/', user) // Handle /user
-```
+- **No partial wildcards**: Patterns like `/file*.txt` are not supported
+- **No nested parameters**: Patterns like `/:a/:b{:c}` are invalid
+- **Case sensitivity**: All matching is case-sensitive
 
-## Base path
+### Execution Behavior
 
-You can specify the base path.
+- **First match wins**: Later routes with same pattern are unreachable
+- **Handler stopping**: Returned Response stops middleware chain
+- **Error propagation**: Errors bubble up to global error handler
 
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const api = new Hono().basePath('/api')
-api.get('/book', (c) => c.text('List Books')) // GET /api/book
-```
+### Route Order Dependencies
 
-## Routing with hostname
-
-It works fine if it includes a hostname.
-
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const app = new Hono({
-  getPath: (req) => req.url.replace(/^https?:\/([^?]+).*$/, '$1'),
-})
-
-app.get('/www1.example.com/hello', (c) => c.text('hello www1'))
-app.get('/www2.example.com/hello', (c) => c.text('hello www2'))
-```
-
-## Routing with `host` Header value
-
-Hono can handle the `host` header value if you set the `getPath()` function in the Hono constructor.
-
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const app = new Hono({
-  getPath: (req) =>
-    '/' +
-    req.headers.get('host') +
-    req.url.replace(/^https?:\/\/[^/]+(\/[^?]*).*/, '$1'),
-})
-
-app.get('/www1.example.com/hello', (c) => c.text('hello www1'))
-
-// A following request will match the route:
-// new Request('http://www1.example.com/hello', {
-//  headers: { host: 'www1.example.com' },
-// })
-```
-
-By applying this, for example, you can change the routing by `User-Agent` header.
-
-## Routing priority
-
-Handlers or middleware will be executed in registration order.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/book/a', (c) => c.text('a')) // a
-app.get('/book/:slug', (c) => c.text('common')) // common
-```
-
-```
-GET /book/a ---> `a`
-GET /book/b ---> `common`
-```
-
-When a handler is executed, the process will be stopped.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('*', (c) => c.text('common')) // common
-app.get('/foo', (c) => c.text('foo')) // foo
-```
-
-```
-GET /foo ---> `common` // foo will not be dispatched
-```
-
-If you have the middleware that you want to execute, write the code above the handler.
-
-```ts twoslash
-import { Hono } from 'hono'
-import { logger } from 'hono/logger'
-const app = new Hono()
-// ---cut---
-app.use(logger())
-app.get('/foo', (c) => c.text('foo'))
-```
-
-If you want to have a "_fallback_" handler, write the code below the other handler.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/bar', (c) => c.text('bar')) // bar
-app.get('*', (c) => c.text('fallback')) // fallback
-```
-
-```
-GET /bar ---> `bar`
-GET /foo ---> `fallback`
-```
-
-## Grouping ordering
-
-Note that the mistake of grouping routings is hard to notice.
-The `route()` function takes the stored routing from the second argument (such as `three` or `two`) and adds it to its own (`two` or `app`) routing.
+Incorrect registration order can make routes unreachable:
 
 ```ts
-three.get('/hi', (c) => c.text('hi'))
-two.route('/three', three)
-app.route('/two', two)
+// WRONG: Generic route registered first
+app.get('/:id', handler)      // This will catch everything
+app.get('/special', handler)  // This will never execute
 
-export default app
+// CORRECT: Specific routes first  
+app.get('/special', handler)  // This executes for /special
+app.get('/:id', handler)      // This executes for other paths
 ```
 
-It will return 200 response.
+## See Also
 
-```
-GET /two/three/hi ---> `hi`
-```
-
-However, if they are in the wrong order, it will return a 404.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-const two = new Hono()
-const three = new Hono()
-// ---cut---
-three.get('/hi', (c) => c.text('hi'))
-app.route('/two', two) // `two` does not have routes
-two.route('/three', three)
-
-export default app
-```
-
-```
-GET /two/three/hi ---> 404 Not Found
-```
+- [Routing Examples](/docs/api/routing-examples) - Practical routing patterns and examples
+- [Hono Specification](/docs/api/hono) - Main application class specification
+- [Context Specification](/docs/api/context) - Request-response context object
+- [Router Presets](/docs/api/presets) - Available router configurations

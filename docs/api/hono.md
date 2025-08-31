@@ -1,232 +1,306 @@
-# App - Hono
+# Hono Specification
 
-`Hono` is the primary object.
-It will be imported first and used until the end.
+The `Hono` class is the main application class that handles routing, middleware, and request-response processing.
 
-```ts twoslash
-import { Hono } from 'hono'
-
-const app = new Hono()
-//...
-
-export default app // for Cloudflare Workers or Bun
-```
-
-## Methods
-
-An instance of `Hono` has the following methods.
-
-- app.**HTTP_METHOD**(\[path,\]handler|middleware...)
-- app.**all**(\[path,\]handler|middleware...)
-- app.**on**(method|method[], path|path[], handler|middleware...)
-- app.**use**(\[path,\]middleware)
-- app.**route**(path, \[app\])
-- app.**basePath**(path)
-- app.**notFound**(handler)
-- app.**onError**(err, handler)
-- app.**mount**(path, anotherApp)
-- app.**fire**()
-- app.**fetch**(request, env, event)
-- app.**request**(path, options)
-
-The first part of them is used for routing, please refer to the [routing section](/docs/api/routing).
-
-## Not Found
-
-`app.notFound` allows you to customize a Not Found Response.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.notFound((c) => {
-  return c.text('Custom 404 Message', 404)
-})
-```
-
-## Error Handling
-
-`app.onError` handles an error and returns a customized Response.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.onError((err, c) => {
-  console.error(`${err}`)
-  return c.text('Custom Error Message', 500)
-})
-```
-
-## fire()
-
-::: warning
-**`app.fire()` is deprecated**. Use `fire()` from `hono/service-worker` instead. See the [Service Worker documentation](/docs/getting-started/service-worker) for details.
-:::
-
-`app.fire()` automatically adds a global `fetch` event listener.
-
-This can be useful for environments that adhere to the [Service Worker API](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API), such as [non-ES module Cloudflare Workers](https://developers.cloudflare.com/workers/reference/migrate-to-module-workers/).
-
-`app.fire()` executes the following for you:
+## Type Definition
 
 ```ts
-addEventListener('fetch', (event: FetchEventLike): void => {
-  event.respondWith(this.dispatch(...))
-})
+class Hono<Env = {}, Schema = {}, BasePath extends string = '/'>
 ```
 
-## fetch()
+**Type Parameters:**
+- `Env`: Environment type including `Bindings` and `Variables`
+- `Schema`: API schema type for type-safe routing
+- `BasePath`: Base path string literal type
 
-`app.fetch` will be entry point of your application.
+## Constructor
 
-For Cloudflare Workers, you can use the following:
+### `new Hono(options?)`
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-type Env = any
-type ExecutionContext = any
-// ---cut---
-export default {
-  fetch(request: Request, env: Env, ctx: ExecutionContext) {
-    return app.fetch(request, env, ctx)
-  },
-}
-```
+Creates a new Hono application instance.
 
-or just do:
+**Parameters:**
+- `options` (optional): `HonoOptions<Env>` - Configuration options
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-export default app
-```
+**Options:**
+- `strict?: boolean` - Enable strict trailing slash handling (default: `true`)
+- `router?: Router` - Custom router instance (default: `SmartRouter`)
+- `getPath?: (request: Request) => string` - Custom path extraction function
 
-Bun:
+**Returns:** `Hono<Env, Schema, BasePath>`
 
-<!-- prettier-ignore -->
+## Core Methods
+
+### HTTP Method Routing
+
+#### `get(path, ...handlers)`
+#### `post(path, ...handlers)`
+#### `put(path, ...handlers)`
+#### `delete(path, ...handlers)`
+#### `head(path, ...handlers)`
+#### `options(path, ...handlers)`
+#### `patch(path, ...handlers)`
+
+Register a handler for the specified HTTP method and path.
+
+**Parameters:**
+- `path`: `string` - Route path pattern
+- `...handlers`: `Handler[]` - One or more request handlers or middleware
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+**Notes:**
+- Path patterns support parameters, wildcards, and regex constraints
+- Multiple handlers are executed in order, use `await next()` in middleware
+
+#### `all(path, ...handlers)`
+
+Register a handler that matches all HTTP methods.
+
+**Parameters:**
+- `path`: `string` - Route path pattern  
+- `...handlers`: `Handler[]` - One or more request handlers or middleware
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+#### `on(method, path, ...handlers)`
+
+Register a handler for custom HTTP methods or multiple methods/paths.
+
+**Parameters:**
+- `method`: `string | string[]` - HTTP method(s)
+- `path`: `string | string[]` - Route path pattern(s)
+- `...handlers`: `Handler[]` - One or more request handlers or middleware
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+### Middleware Registration
+
+#### `use(path?, ...middleware)`
+
+Register middleware that executes for all matching routes.
+
+**Parameters:**
+- `path` (optional): `string` - Path pattern to match (default: `'*'`)
+- `...middleware`: `MiddlewareHandler[]` - Middleware functions
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+**Notes:**
+- Middleware executes in registration order
+- Must call `await next()` to continue to subsequent middleware/handlers
+
+### Application Composition
+
+#### `route(path, app)`
+
+Mount a sub-application at the specified path.
+
+**Parameters:**
+- `path`: `string` - Base path for the sub-application
+- `app`: `Hono` - Hono application instance to mount
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+**Notes:**
+- Routes from the sub-application are prefixed with the mount path
+- Sub-application middleware and error handlers are preserved
+
+#### `basePath(path)`
+
+Set a base path for all routes in this application.
+
+**Parameters:**
+- `path`: `string` - Base path string
+
+**Returns:** `Hono` - A new Hono instance with the base path applied
+
+**Notes:**
+- Returns a new instance, does not modify the original
+- All routes registered on the returned instance will be prefixed
+
+#### `mount(path, fetchLike)`
+
+Mount a fetch-compatible application or function.
+
+**Parameters:**
+- `path`: `string` - Base path for mounting
+- `fetchLike`: `(request: Request, ...args: any[]) => Response | Promise<Response>` - Fetch-compatible handler
+
+**Returns:** `Hono` - The application instance (for method chaining)
+
+**Notes:**
+- Useful for integrating with other frameworks or external applications
+- The mounted application receives the full Request object
+
+## Error and Response Handling
+
+### `notFound(handler)`
+
+Register a custom handler for 404 Not Found responses.
+
+**Parameters:**
+- `handler`: `NotFoundHandler` - Handler function for 404 responses
+
+**Type Definition:**
 ```ts
-export default app // [!code --]
-export default {  // [!code ++]
-  port: 3000, // [!code ++]
-  fetch: app.fetch, // [!code ++]
-} // [!code ++]
+type NotFoundHandler = (c: Context) => Response | Promise<Response>
 ```
 
-## request()
+**Returns:** `Hono` - The application instance (for method chaining)
 
-`request` is a useful method for testing.
+**Notes:**
+- Executes when no routes match the request
+- Only one notFound handler can be registered (last one wins)
 
-You can pass a URL or pathname to send a GET request.
-`app` will return a `Response` object.
+### `onError(handler)`
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-declare const test: (name: string, fn: () => void) => void
-declare const expect: (value: any) => any
-// ---cut---
-test('GET /hello is ok', async () => {
-  const res = await app.request('/hello')
-  expect(res.status).toBe(200)
-})
+Register a global error handler for uncaught exceptions.
+
+**Parameters:**
+- `handler`: `ErrorHandler` - Error handling function
+
+**Type Definition:**
+```ts
+type ErrorHandler = (err: Error, c: Context) => Response | Promise<Response>
 ```
 
-You can also pass a `Request` object:
+**Returns:** `Hono` - The application instance (for method chaining)
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-declare const test: (name: string, fn: () => void) => void
-declare const expect: (value: any) => any
-// ---cut---
-test('POST /message is ok', async () => {
-  const req = new Request('Hello!', {
-    method: 'POST',
-  })
-  const res = await app.request(req)
-  expect(res.status).toBe(201)
-})
+**Notes:**
+- Catches errors thrown by handlers or middleware
+- Only one error handler can be registered (last one wins)
+- Should return a Response object
+
+## Application Entry Points
+
+### `fetch(request, env?, executionCtx?)`
+
+Main entry point for handling HTTP requests.
+
+**Parameters:**
+- `request`: `Request` - The HTTP request object
+- `env` (optional): `Env['Bindings']` - Environment bindings (e.g., KV stores, secrets)
+- `executionCtx` (optional): `ExecutionContext` - Execution context (Cloudflare Workers)
+
+**Returns:** `Response | Promise<Response>`
+
+**Notes:**
+- This is the primary method called by the runtime
+- Compatible with Web Standards fetch API
+- Handles routing, middleware execution, and response generation
+
+### `request(path, options?)`
+
+Create a test request to the application.
+
+**Parameters:**
+- `path`: `string | Request` - URL path or complete Request object
+- `options` (optional): `RequestInit` - Request options (method, headers, body, etc.)
+
+**Returns:** `Promise<Response>`
+
+**Notes:**
+- Primarily used for testing
+- If first parameter is a string, creates a GET request by default
+- If first parameter is a Request object, options parameter is ignored
+
+### `fire()` *(Deprecated)*
+
+**Status:** Deprecated - Use `fire()` from `hono/service-worker` instead
+
+Automatically adds a global `fetch` event listener.
+
+**Returns:** `void`
+
+**Notes:**
+- Only useful for Service Worker environments
+- Executes `addEventListener('fetch', ...)` automatically
+- Use `hono/service-worker` for new projects
+
+## Configuration Options
+
+### Strict Mode
+
+When `strict: true` (default):
+- `/hello` and `/hello/` are treated as different routes
+- Trailing slashes must match exactly
+
+When `strict: false`:
+- `/hello` and `/hello/` are treated as the same route
+- More flexible path matching
+
+### Custom Router
+
+The `router` option allows specifying which routing algorithm to use:
+- `SmartRouter` (default) - Automatically selects best router
+- `RegExpRouter` - Fastest for most cases
+- `TrieRouter` - Supports all patterns
+- `LinearRouter` - Simple linear matching
+- `PatternRouter` - Smallest bundle size
+
+### Custom Path Extraction
+
+The `getPath` function allows custom URL parsing logic:
+
+**Type:**
+```ts
+getPath?: (request: Request) => string
 ```
 
-## mount()
+**Use Cases:**
+- Hostname-based routing
+- Header-based routing (e.g., User-Agent)
+- Custom URL parsing logic
 
-The `mount()` allows you to mount applications built with other frameworks into your Hono application.
+## Type Safety
+
+### Environment Types
 
 ```ts
-import { Router as IttyRouter } from 'itty-router'
-import { Hono } from 'hono'
-
-// Create itty-router application
-const ittyRouter = IttyRouter()
-
-// Handle `GET /itty-router/hello`
-ittyRouter.get('/hello', () => new Response('Hello from itty-router'))
-
-// Hono application
-const app = new Hono()
-
-// Mount!
-app.mount('/itty-router', ittyRouter.handle)
-```
-
-## strict mode
-
-Strict mode defaults to `true` and distinguishes the following routes.
-
-- `/hello`
-- `/hello/`
-
-`app.get('/hello')` will not match `GET /hello/`.
-
-By setting strict mode to `false`, both paths will be treated equally.
-
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-const app = new Hono({ strict: false })
-```
-
-## router option
-
-The `router` option specifices which router to use. The default router is `SmartRouter`. If you want to use `RegExpRouter`, pass it to a new `Hono` instance:
-
-```ts twoslash
-import { Hono } from 'hono'
-// ---cut---
-import { RegExpRouter } from 'hono/router/reg-exp-router'
-
-const app = new Hono({ router: new RegExpRouter() })
-```
-
-## Generics
-
-You can pass Generics to specify the types of Cloudflare Workers Bindings and variables used in `c.set`/`c.get`.
-
-```ts twoslash
-import { Hono } from 'hono'
-type User = any
-declare const user: User
-// ---cut---
-type Bindings = {
-  TOKEN: string
+type HonoEnv = {
+  Bindings: {
+    // Environment variables, KV stores, etc.
+    API_KEY: string
+    DB: KVNamespace
+  }
+  Variables: {
+    // Per-request variables set via c.set()
+    user: User
+    requestId: string
+  }
 }
 
-type Variables = {
-  user: User
+const app = new Hono<HonoEnv>()
+```
+
+### Schema Types
+
+For API type safety with libraries like Hono RPC:
+
+```ts
+type AppSchema = {
+  '/api/users': {
+    $get: {
+      query: { page?: string }
+      response: { users: User[] }
+    }
+  }
 }
 
-const app = new Hono<{
-  Bindings: Bindings
-  Variables: Variables
-}>()
-
-app.use('/auth/*', async (c, next) => {
-  const token = c.env.TOKEN // token is `string`
-  // ...
-  c.set('user', user) // user should be `User`
-  await next()
-})
+const app = new Hono<Env, AppSchema>()
 ```
+
+## Performance Characteristics
+
+- **Cold start**: Optimized for serverless environments
+- **Memory usage**: Minimal footprint
+- **Request handling**: High throughput with proper router selection
+- **Bundle size**: Varies by router choice (15KB - 40KB typical)
+
+## See Also
+
+- [Hono Examples](/docs/api/hono-examples) - Practical usage examples and patterns
+- [Routing Specification](/docs/api/routing) - Complete routing system specification
+- [Context Specification](/docs/api/context) - Request-response context object
+- [Router Presets](/docs/api/presets) - Available router configurations

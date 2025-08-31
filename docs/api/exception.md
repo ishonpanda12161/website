@@ -1,85 +1,298 @@
-# Exception
+# Exception Handling Specification
 
-When a fatal error occurs, such as authentication failure, an HTTPException must be thrown.
+The HTTPException class provides structured HTTP error handling for Hono applications, allowing for consistent error responses with proper status codes and messages.
 
-## throw HTTPException
+## HTTPException Class
 
-This example throws an HTTPException from the middleware.
+### Type Definition
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-declare const authorized: boolean
-// ---cut---
-import { HTTPException } from 'hono/http-exception'
+```ts
+class HTTPException extends Error {
+  readonly status: number
+  readonly res?: Response
+  readonly cause?: unknown
+}
+```
 
-// ...
+**Properties:**
+- `status`: HTTP status code
+- `res`: Optional custom Response object
+- `cause`: Optional underlying error cause
+- `message`: Error message (inherited from Error)
 
-app.post('/auth', async (c, next) => {
-  // authentication
-  if (authorized === false) {
-    throw new HTTPException(401, { message: 'Custom error message' })
+## Constructor
+
+### `new HTTPException(status, options?)`
+
+Create a new HTTP exception.
+
+**Signature:**
+```ts
+new HTTPException(status: number, options?: HTTPExceptionOptions)
+```
+
+**Parameters:**
+- `status`: `number` - HTTP status code (e.g., 400, 401, 403, 404, 500)
+- `options` (optional): `HTTPExceptionOptions` - Additional configuration
+
+**HTTPExceptionOptions:**
+```ts
+interface HTTPExceptionOptions {
+  message?: string
+  res?: Response
+  cause?: unknown
+}
+```
+
+- `message`: Custom error message
+- `res`: Pre-built Response object to return
+- `cause`: Underlying error or cause information
+
+**Examples:**
+```ts
+// Basic exception with status
+throw new HTTPException(401)
+
+// With custom message
+throw new HTTPException(403, { message: 'Access denied' })
+
+// With custom response
+throw new HTTPException(401, { res: unauthorizedResponse })
+
+// With cause information
+throw new HTTPException(500, { message: 'Database error', cause: dbError })
+```
+
+## Instance Methods
+
+### `.getResponse()`
+
+Get the HTTP response for this exception.
+
+**Signature:**
+```ts
+getResponse(): Response
+```
+
+**Returns:** `Response` - HTTP response object
+
+**Behavior:**
+- If `res` option was provided in constructor, returns that Response
+- Otherwise, creates a new Response with the error message and status code
+- Default message is the HTTP status text for the status code
+
+## Usage Patterns
+
+### In Middleware
+
+HTTPException is commonly thrown in middleware for authentication, authorization, and validation:
+
+```ts
+// Authentication middleware
+app.use(async (c, next) => {
+  const token = c.req.header('Authorization')
+  if (!token) {
+    throw new HTTPException(401, { message: 'Authorization required' })
   }
   await next()
 })
 ```
 
-You can specify the response to be returned back to the user.
+### In Route Handlers
 
-```ts twoslash
-import { HTTPException } from 'hono/http-exception'
+Thrown when request processing encounters errors:
 
-const errorResponse = new Response('Unauthorized', {
-  status: 401,
-  headers: {
-    Authenticate: 'error="invalid_token"',
-  },
+```ts
+app.get('/user/:id', async (c) => {
+  const id = c.req.param('id')
+  const user = await getUserById(id)
+  
+  if (!user) {
+    throw new HTTPException(404, { message: 'User not found' })
+  }
+  
+  return c.json(user)
 })
-
-throw new HTTPException(401, { res: errorResponse })
 ```
 
-## Handling HTTPException
+### With Custom Response
 
-You can handle the thrown HTTPException with `app.onError`.
+For complete control over the error response:
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-import { HTTPException } from 'hono/http-exception'
+```ts
+const customErrorResponse = new Response(
+  JSON.stringify({ error: 'Unauthorized', code: 'AUTH001' }),
+  {
+    status: 401,
+    headers: {
+      'Content-Type': 'application/json',
+      'WWW-Authenticate': 'Bearer realm="api"'
+    }
+  }
+)
 
-// ...
+throw new HTTPException(401, { res: customErrorResponse })
+```
 
+## Error Handling Integration
+
+### Global Error Handler
+
+HTTPException integrates with Hono's global error handling:
+
+```ts
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
-    // Get the custom response
     return err.getResponse()
   }
-  // ...
-  // ---cut-start---
-  return c.text('Error')
-  // ---cut-end---
+  
+  // Handle other errors
+  console.error(err)
+  return c.text('Internal Server Error', 500)
 })
 ```
 
-## `cause`
+### Error Handler Signature
 
-The `cause` option is available to add a [`cause`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause) data.
+```ts
+type ErrorHandler = (error: Error, c: Context) => Response | Promise<Response>
+```
 
-```ts twoslash
-import { Hono, Context } from 'hono'
-import { HTTPException } from 'hono/http-exception'
-const app = new Hono()
-declare const message: string
-declare const authorize: (c: Context) => void
-// ---cut---
-app.post('/auth', async (c, next) => {
+**Parameters:**
+- `error`: The caught error (may be HTTPException or other Error types)
+- `c`: Context object for the current request
+
+**Returns:** Response object for the error
+
+## Error Cause Tracking
+
+### Using the `cause` Option
+
+The `cause` option allows chaining errors for better debugging:
+
+```ts
+app.post('/process', async (c) => {
   try {
-    authorize(c)
-  } catch (e) {
-    throw new HTTPException(401, { message, cause: e })
+    await processData(c.req.json())
+  } catch (originalError) {
+    throw new HTTPException(500, { 
+      message: 'Processing failed',
+      cause: originalError 
+    })
   }
-  await next()
 })
 ```
+
+### Cause Information Access
+
+Access the original error through the `cause` property:
+
+```ts
+app.onError((err, c) => {
+  if (err instanceof HTTPException && err.cause) {
+    console.error('Original error:', err.cause)
+  }
+  
+  return err instanceof HTTPException 
+    ? err.getResponse()
+    : c.text('Internal Error', 500)
+})
+```
+
+## Status Code Guidelines
+
+### Client Error Status Codes (4xx)
+
+- **400 Bad Request**: Invalid request format or parameters
+- **401 Unauthorized**: Authentication required
+- **403 Forbidden**: Access denied (authenticated but not authorized)
+- **404 Not Found**: Resource does not exist
+- **405 Method Not Allowed**: HTTP method not supported
+- **409 Conflict**: Request conflicts with current state
+- **422 Unprocessable Entity**: Validation errors
+
+### Server Error Status Codes (5xx)
+
+- **500 Internal Server Error**: Unhandled server error
+- **502 Bad Gateway**: Upstream service error
+- **503 Service Unavailable**: Service temporarily unavailable
+- **504 Gateway Timeout**: Upstream service timeout
+
+## Response Format
+
+### Default Response Format
+
+When no custom response is provided:
+- **Content-Type**: `text/plain; charset=UTF-8`
+- **Status**: The provided status code
+- **Body**: The error message or default status text
+
+### Custom Response Format
+
+Full control over response headers, content type, and body:
+
+```ts
+const jsonErrorResponse = new Response(
+  JSON.stringify({ 
+    error: true,
+    message: 'Validation failed',
+    details: validationErrors 
+  }),
+  {
+    status: 422,
+    headers: { 'Content-Type': 'application/json' }
+  }
+)
+
+throw new HTTPException(422, { res: jsonErrorResponse })
+```
+
+## Error Context Information
+
+### Request Context in Errors
+
+Access request information in error handlers:
+
+```ts
+app.onError((err, c) => {
+  const errorInfo = {
+    error: err.message,
+    path: c.req.path,
+    method: c.req.method,
+    timestamp: new Date().toISOString()
+  }
+  
+  if (err instanceof HTTPException) {
+    return c.json(errorInfo, err.status)
+  }
+  
+  return c.json({ ...errorInfo, error: 'Internal Server Error' }, 500)
+})
+```
+
+## Best Practices
+
+### Error Message Guidelines
+
+- **Be specific but not revealing**: Include enough information to help the client without exposing internal details
+- **Use consistent format**: Maintain consistent error message structure across your API
+- **Localization consideration**: Structure messages for potential internationalization
+
+### Security Considerations
+
+- **Avoid information disclosure**: Don't reveal sensitive system information in error messages
+- **Validate status codes**: Ensure status codes match the actual error condition
+- **Log internal errors**: Use logging for detailed error tracking while keeping client responses clean
+
+### Performance Considerations
+
+- **Avoid expensive operations in error paths**: Keep error handling lightweight
+- **Cache error responses**: For common errors, consider caching response objects
+- **Minimize error object creation**: Reuse HTTPException instances when appropriate
+
+## See Also
+
+- [Hono Application Specification](/docs/api/hono) - Error handling configuration
+- [Context Specification](/docs/api/context) - Error context and handling
+- [Exception Examples](/docs/api/exception-examples) - Practical usage patterns
+- [MDN Error.cause](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause) - JavaScript Error cause property

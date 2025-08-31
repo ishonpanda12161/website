@@ -194,10 +194,10 @@ app.post('/contact', async (c) => {
 
 ### File Uploads
 
-```ts twoslash
+```ts
 import { Hono } from 'hono'
 const app = new Hono()
-// ---cut---
+
 // Single file upload
 app.post('/upload', async (c) => {
   const body = await c.req.parseBody()
@@ -400,13 +400,13 @@ app.get('/posts/:id', (c) => {
 
 ### Cloudflare Workers
 
-```ts twoslash
+```ts
 import { Hono } from 'hono'
 const app = new Hono()
-// ---cut---
+
 app.get('/cf-info', (c) => {
   // Access Cloudflare-specific request properties
-  const cf = c.req.raw.cf
+  const cf = (c.req.raw as any).cf
   
   if (cf) {
     return c.json({

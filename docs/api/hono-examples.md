@@ -18,14 +18,14 @@ export default app // for Cloudflare Workers or Bun
 
 ### With TypeScript Generics
 
-```ts twoslash
+```ts
 import { Hono } from 'hono'
 type User = any
 declare const user: User
-// ---cut---
+
 type Bindings = {
   TOKEN: string
-  DB: D1Database
+  DB: any // D1Database type simplified for example
 }
 
 type Variables = {
@@ -40,7 +40,7 @@ const app = new Hono<{
 
 app.use('/auth/*', async (c, next) => {
   const token = c.env.TOKEN // token is `string`
-  const db = c.env.DB // db is `D1Database`
+  const db = c.env.DB // db is D1Database
   // ...
   c.set('user', user) // user should be `User`
   c.set('requestId', crypto.randomUUID())

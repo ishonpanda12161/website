@@ -1,85 +1,156 @@
-# Exception
+# Exception Specification
 
-When a fatal error occurs, such as authentication failure, an HTTPException must be thrown.
+Hono provides structured error handling through the `HTTPException` class and global error handling mechanisms for managing HTTP errors and custom error responses.
 
-## throw HTTPException
+## HTTPException Class
 
-This example throws an HTTPException from the middleware.
+### Constructor
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-declare const authorized: boolean
-// ---cut---
-import { HTTPException } from 'hono/http-exception'
-
-// ...
-
-app.post('/auth', async (c, next) => {
-  // authentication
-  if (authorized === false) {
-    throw new HTTPException(401, { message: 'Custom error message' })
-  }
-  await next()
-})
+```ts
+new HTTPException(status, options?)
 ```
 
-You can specify the response to be returned back to the user.
+Parameters:
+- status: `number` — HTTP status code (e.g., 401, 404, 500)
+- options (optional): `HTTPExceptionOptions`
+  - message: `string` — Custom error message
+  - res: `Response` — Custom Response object to return
+  - cause: `unknown` — Underlying cause of the error
 
-```ts twoslash
+Returns: `HTTPException` instance
+
+### Methods
+
+#### getResponse()
+
+Generate the HTTP response for the exception.
+
+```ts
+getResponse(): Response
+```
+
+Returns: `Response` — HTTP response based on status and options
+
+**Behavior:**
+- If `options.res` was provided in constructor, returns that Response
+- Otherwise, creates a Response with the status code and message
+
+## Throwing HTTPExceptions
+
+### Basic Usage
+
+Throw an HTTPException to immediately halt request processing and return an error response:
+
+```ts
 import { HTTPException } from 'hono/http-exception'
 
+// Simple error with status and message
+throw new HTTPException(401, { message: 'Authentication required' })
+
+// Error with custom response
 const errorResponse = new Response('Unauthorized', {
   status: 401,
-  headers: {
-    Authenticate: 'error="invalid_token"',
-  },
+  headers: { 'WWW-Authenticate': 'Bearer' }
 })
-
 throw new HTTPException(401, { res: errorResponse })
 ```
 
-## Handling HTTPException
+### With Cause Chain
 
-You can handle the thrown HTTPException with `app.onError`.
+Preserve the original error context using the `cause` option:
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-import { HTTPException } from 'hono/http-exception'
-
-// ...
-
-app.onError((err, c) => {
-  if (err instanceof HTTPException) {
-    // Get the custom response
-    return err.getResponse()
-  }
-  // ...
-  // ---cut-start---
-  return c.text('Error')
-  // ---cut-end---
-})
-```
-
-## `cause`
-
-The `cause` option is available to add a [`cause`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause) data.
-
-```ts twoslash
-import { Hono, Context } from 'hono'
-import { HTTPException } from 'hono/http-exception'
-const app = new Hono()
-declare const message: string
-declare const authorize: (c: Context) => void
-// ---cut---
-app.post('/auth', async (c, next) => {
+```ts
+app.post('/protected', async (c, next) => {
   try {
-    authorize(c)
-  } catch (e) {
-    throw new HTTPException(401, { message, cause: e })
+    await validateToken(c.req.header('authorization'))
+  } catch (originalError) {
+    throw new HTTPException(401, { 
+      message: 'Token validation failed',
+      cause: originalError 
+    })
   }
   await next()
 })
 ```
+
+## Global Error Handling
+
+### app.onError()
+
+Register a global error handler for all unhandled exceptions:
+
+```ts
+app.onError(handler)
+```
+
+Parameters:
+- handler: `(err: Error, c: Context) => Response | Promise<Response>`
+
+**Handler receives:**
+- err: `Error` — The thrown error (may be HTTPException or any Error)
+- c: `Context` — Request context for creating responses
+
+### Error Handler Patterns
+
+```ts
+app.onError((err, c) => {
+  // Handle HTTPException specifically
+  if (err instanceof HTTPException) {
+    return err.getResponse()
+  }
+  
+  // Handle other error types
+  console.error('Unexpected error:', err)
+  return c.text('Internal Server Error', 500)
+})
+```
+
+## Error Response Flow
+
+1. **Exception thrown** — HTTPException thrown from middleware/handler
+2. **Processing halted** — Request processing stops immediately  
+3. **Error handler invoked** — Global `onError` handler receives the exception
+4. **Response generated** — Handler returns appropriate Response object
+
+## Integration with Middleware
+
+HTTPExceptions work seamlessly with middleware patterns:
+
+```ts
+// Authentication middleware
+app.use('/protected/*', async (c, next) => {
+  const token = c.req.header('authorization')
+  
+  if (!token) {
+    throw new HTTPException(401, { message: 'Missing authorization header' })
+  }
+  
+  if (!await isValidToken(token)) {
+    throw new HTTPException(403, { message: 'Invalid token' })
+  }
+  
+  await next()
+})
+
+// Routes are only reached if authentication passes
+app.get('/protected/resource', (c) => {
+  return c.json({ data: 'protected content' })
+})
+```
+
+## Status Code Conventions
+
+Common HTTP status codes used with HTTPException:
+
+- `400` — Bad Request (invalid client input)
+- `401` — Unauthorized (authentication required)
+- `403` — Forbidden (access denied)
+- `404` — Not Found (resource doesn't exist)
+- `422` — Unprocessable Entity (validation failure)
+- `500` — Internal Server Error (server-side errors)
+
+## See Also
+
+- [Context](/docs/api/context) — Request context and response helpers
+- [Hono Object](/docs/api/hono) — Global error handler registration
+- [Middleware](/docs/guides/middleware) — Using exceptions in middleware patterns

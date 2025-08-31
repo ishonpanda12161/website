@@ -83,6 +83,7 @@ const sidebars = (): DefaultTheme.SidebarItem[] => [
       { text: 'App', link: '/docs/api/hono' },
       { text: 'Routing', link: '/docs/api/routing' },
       { text: 'Context', link: '/docs/api/context' },
+      { text: 'Context Examples', link: '/docs/api/context-examples' },
       { text: 'HonoRequest', link: '/docs/api/request' },
       { text: 'Exception', link: '/docs/api/exception' },
       { text: 'Presets', link: '/docs/api/presets' },

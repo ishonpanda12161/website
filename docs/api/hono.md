@@ -9,6 +9,7 @@ class Hono<E extends Env = Env, S extends Schema = {}, BasePath extends string =
 ```
 
 **Type Parameters:**
+
 - `E`: Environment bindings type (e.g., Cloudflare Workers bindings)
 - `S`: Schema type for type-safe routing
 - `BasePath`: Base path string for the application
@@ -20,6 +21,7 @@ class Hono<E extends Env = Env, S extends Schema = {}, BasePath extends string =
 Creates a new Hono application instance.
 
 **Parameters:**
+
 - `options` (optional): `HonoOptions`
   - `strict?: boolean` - Enable strict routing (default: `true`)
   - `router?: Router` - Custom router instance
@@ -28,6 +30,7 @@ Creates a new Hono application instance.
 **Returns:** `Hono<E, S, BasePath>`
 
 **Example:**
+
 ```ts
 import { Hono } from 'hono'
 import { RegExpRouter } from 'hono/router/reg-exp-router'
@@ -36,25 +39,32 @@ import { RegExpRouter } from 'hono/router/reg-exp-router'
 const app = new Hono()
 
 // With options
-const strictApp = new Hono({ 
+const strictApp = new Hono({
   strict: false,
-  router: new RegExpRouter()
+  router: new RegExpRouter(),
 })
 ```
 
 ## HTTP Method Routing
 
 ### `get(path, ...handlers)`
+
 ### `post(path, ...handlers)`
+
 ### `put(path, ...handlers)`
+
 ### `delete(path, ...handlers)`
+
 ### `head(path, ...handlers)`
+
 ### `options(path, ...handlers)`
+
 ### `patch(path, ...handlers)`
 
 Register handlers for specific HTTP methods.
 
 **Parameters:**
+
 - `path`: `string` - Route path pattern
 - `...handlers`: `Handler[]` - Request handlers and middleware
 
@@ -67,7 +77,8 @@ Register handlers for specific HTTP methods.
 Register handlers for all HTTP methods.
 
 **Parameters:**
-- `path`: `string` - Route path pattern  
+
+- `path`: `string` - Route path pattern
 - `...handlers`: `Handler[]` - Request handlers and middleware
 
 **Returns:** `Hono`
@@ -77,6 +88,7 @@ Register handlers for all HTTP methods.
 Register handlers for custom or multiple HTTP methods.
 
 **Parameters:**
+
 - `method`: `string | string[]` - HTTP method(s)
 - `path`: `string | string[]` - Route path pattern(s)
 - `...handlers`: `Handler[]` - Request handlers and middleware
@@ -90,12 +102,14 @@ Register handlers for custom or multiple HTTP methods.
 Register middleware for request processing.
 
 **Parameters:**
+
 - `path` (optional): `string` - Path pattern to apply middleware
 - `...middleware`: `MiddlewareHandler[]` - Middleware functions
 
 **Returns:** `Hono`
 
 **Notes:**
+
 - Middleware executes in registration order
 - If no path is specified, middleware applies to all routes
 
@@ -106,12 +120,14 @@ Register middleware for request processing.
 Mount a sub-application at the specified path.
 
 **Parameters:**
+
 - `path`: `string` - Mount path
 - `app`: `Hono` - Sub-application to mount
 
 **Returns:** `Hono`
 
 **Notes:**
+
 - Routes from the sub-application are prefixed with the mount path
 - Middleware from the sub-application is preserved
 
@@ -120,11 +136,13 @@ Mount a sub-application at the specified path.
 Set a base path for all routes in the application.
 
 **Parameters:**
+
 - `path`: `string` - Base path to prepend to all routes
 
 **Returns:** `Hono<E, S, BasePath>`
 
 **Notes:**
+
 - All subsequent routes will be prefixed with this path
 - Returns a new typed instance with the base path
 
@@ -133,12 +151,14 @@ Set a base path for all routes in the application.
 Mount an external application or framework.
 
 **Parameters:**
+
 - `path`: `string` - Mount path
 - `fetchFunction`: `(request: Request, ...args: any[]) => Response | Promise<Response>` - External app's fetch function
 
 **Returns:** `Hono`
 
 **Notes:**
+
 - Used for integrating other frameworks or applications
 - The mounted application receives requests with the mount path stripped
 
@@ -149,13 +169,17 @@ Mount an external application or framework.
 Set a custom handler for 404 Not Found responses.
 
 **Parameters:**
+
 - `handler`: `NotFoundHandler<E>` - Function to handle 404 responses
 
 **Returns:** `Hono`
 
 **Type:**
+
 ```ts
-type NotFoundHandler<E extends Env = Env> = (c: Context<E>) => Response | Promise<Response>
+type NotFoundHandler<E extends Env = Env> = (
+  c: Context<E>
+) => Response | Promise<Response>
 ```
 
 ### `onError(handler)`
@@ -163,14 +187,16 @@ type NotFoundHandler<E extends Env = Env> = (c: Context<E>) => Response | Promis
 Set a global error handler for uncaught exceptions.
 
 **Parameters:**
+
 - `handler`: `ErrorHandler<E>` - Function to handle errors
 
 **Returns:** `Hono`
 
 **Type:**
+
 ```ts
 type ErrorHandler<E extends Env = Env> = (
-  error: Error, 
+  error: Error,
   c: Context<E>
 ) => Response | Promise<Response>
 ```
@@ -182,6 +208,7 @@ type ErrorHandler<E extends Env = Env> = (
 The main entry point for handling HTTP requests.
 
 **Parameters:**
+
 - `request`: `Request` - The incoming HTTP request
 - `env` (optional): `E` - Environment bindings (platform-specific)
 - `executionContext` (optional): `ExecutionContext` - Execution context (platform-specific)
@@ -189,6 +216,7 @@ The main entry point for handling HTTP requests.
 **Returns:** `Promise<Response>`
 
 **Notes:**
+
 - This is the primary method called by the runtime environment
 - Environment and execution context are platform-specific
 
@@ -197,12 +225,14 @@ The main entry point for handling HTTP requests.
 Send a request to the application for testing purposes.
 
 **Parameters:**
+
 - `input`: `string | URL | Request` - Request URL or Request object
 - `init` (optional): `RequestInit` - Request options
 
 **Returns:** `Promise<Response>`
 
 **Notes:**
+
 - Primarily used for unit testing
 - Creates a mock environment for the request
 
@@ -217,6 +247,7 @@ Automatically adds a global fetch event listener for Service Worker environments
 **Returns:** `void`
 
 **Notes:**
+
 - Only for Service Worker API environments
 - Deprecated in favor of explicit Service Worker integration
 
@@ -227,9 +258,11 @@ Automatically adds a global fetch event listener for Service Worker environments
 **Default:** `true`
 
 When enabled, trailing slashes in routes are significant:
+
 - `/hello` and `/hello/` are treated as different routes
 
 When disabled, trailing slashes are ignored:
+
 - `/hello` and `/hello/` are treated as the same route
 
 ### Custom Router
@@ -237,9 +270,10 @@ When disabled, trailing slashes are ignored:
 Specify which router implementation to use:
 
 **Available Routers:**
+
 - `SmartRouter` (default) - Automatically selects optimal router
 - `RegExpRouter` - Uses regular expressions for matching
-- `TrieRouter` - Uses trie data structure for matching  
+- `TrieRouter` - Uses trie data structure for matching
 - `LinearRouter` - Linear search through routes
 - `PatternRouter` - Simple pattern matching
 
@@ -248,6 +282,7 @@ Specify which router implementation to use:
 Override how paths are extracted from requests for advanced routing scenarios like hostname-based routing.
 
 **Type:**
+
 ```ts
 type GetPath = (req: Request) => string
 ```
@@ -260,9 +295,9 @@ Type the environment bindings for your platform:
 
 ```ts
 type Bindings = {
-  DB: D1Database          // Cloudflare D1
-  KV: KVNamespace        // Cloudflare KV
-  API_KEY: string        // Environment variable
+  DB: D1Database // Cloudflare D1
+  KV: KVNamespace // Cloudflare KV
+  API_KEY: string // Environment variable
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -291,8 +326,8 @@ const app = new Hono<{
 }>()
 
 app.use('*', async (c, next) => {
-  const apiKey = c.env.API_KEY      // Typed as string
-  c.set('requestId', 'req-123')     // Typed variable
+  const apiKey = c.env.API_KEY // Typed as string
+  c.set('requestId', 'req-123') // Typed variable
   await next()
 })
 ```
@@ -304,7 +339,7 @@ All routing methods return the Hono instance, enabling method chaining:
 ```ts
 app
   .get('/users', handler)
-  .post('/users', handler)  
+  .post('/users', handler)
   .put('/users/:id', handler)
   .delete('/users/:id', handler)
 ```
@@ -324,6 +359,7 @@ app
 Different platforms require different entry point patterns:
 
 **Cloudflare Workers:**
+
 ```ts
 export default app
 // or
@@ -331,20 +367,22 @@ export default { fetch: app.fetch }
 ```
 
 **Bun:**
+
 ```ts
-export default { 
-  port: 3000, 
-  fetch: app.fetch 
+export default {
+  port: 3000,
+  fetch: app.fetch,
 }
 ```
 
 **Node.js with serve():**
+
 ```ts
 import { serve } from 'bun'
 
 serve({
   port: 3000,
-  fetch: app.fetch
+  fetch: app.fetch,
 })
 ```
 

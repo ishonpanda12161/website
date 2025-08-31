@@ -22,9 +22,9 @@ app.get('/users/:id', async (c) => {
 ```ts
 app.get('/posts/:id/comments/:commentId', async (c) => {
   const { id, commentId } = c.req.param()
-  return c.json({ 
-    postId: id, 
-    commentId: commentId 
+  return c.json({
+    postId: id,
+    commentId: commentId,
   })
 })
 ```
@@ -49,11 +49,11 @@ app.get('/api/posts/:category?', (c) => {
 app.get('/search', async (c) => {
   const query = c.req.query('q')
   const limit = c.req.query('limit') || '10'
-  
+
   return c.json({
     query,
     limit: parseInt(limit),
-    results: []
+    results: [],
   })
 })
 ```
@@ -63,10 +63,10 @@ app.get('/search', async (c) => {
 ```ts
 app.get('/filter', async (c) => {
   const { category, sort, page } = c.req.query()
-  
+
   return c.json({
     filters: { category, sort },
-    pagination: { page: parseInt(page || '1') }
+    pagination: { page: parseInt(page || '1') },
   })
 })
 ```
@@ -77,10 +77,10 @@ app.get('/filter', async (c) => {
 app.get('/search', async (c) => {
   // Handle URLs like /search?tags=javascript&tags=web&tags=api
   const tags = c.req.queries('tags')
-  
+
   return c.json({
     searchTags: tags, // string[]
-    resultCount: tags.length
+    resultCount: tags.length,
   })
 })
 ```
@@ -93,14 +93,14 @@ app.get('/search', async (c) => {
 app.get('/protected', (c) => {
   const auth = c.req.header('Authorization')
   const userAgent = c.req.header('User-Agent')
-  
+
   if (!auth?.startsWith('Bearer ')) {
     return c.text('Unauthorized', 401)
   }
-  
+
   return c.json({
     message: 'Access granted',
-    userAgent
+    userAgent,
   })
 })
 ```
@@ -110,7 +110,7 @@ app.get('/protected', (c) => {
 ```ts
 app.post('/upload', async (c) => {
   const contentType = c.req.header('Content-Type')
-  
+
   if (contentType?.includes('application/json')) {
     const data = await c.req.json()
     return c.json({ type: 'json', data })
@@ -118,7 +118,7 @@ app.post('/upload', async (c) => {
     const data = await c.req.parseBody()
     return c.json({ type: 'form', data })
   }
-  
+
   return c.text('Unsupported content type', 400)
 })
 ```
@@ -130,10 +130,10 @@ app.get('/headers', (c) => {
   // ❌ Won't work - headers() returns lowercase keys
   const headers = c.req.header()
   const customHeader = headers['X-Custom-Header'] // undefined
-  
+
   // ✅ Correct way - use specific header name
   const customHeader = c.req.header('X-Custom-Header')
-  
+
   return c.json({ customHeader })
 })
 ```
@@ -146,16 +146,19 @@ app.get('/headers', (c) => {
 app.post('/api/users', async (c) => {
   try {
     const body = await c.req.json()
-    
+
     // Validate required fields
     if (!body.name || !body.email) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
-    
-    return c.json({ 
-      message: 'User created', 
-      user: { id: 123, ...body } 
-    }, 201)
+
+    return c.json(
+      {
+        message: 'User created',
+        user: { id: 123, ...body },
+      },
+      201
+    )
   } catch (error) {
     return c.json({ error: 'Invalid JSON' }, 400)
   }
@@ -167,13 +170,13 @@ app.post('/api/users', async (c) => {
 ```ts
 app.post('/contact', async (c) => {
   const body = await c.req.parseBody()
-  
+
   const name = body['name'] as string
   const email = body['email'] as string
   const message = body['message'] as string
-  
+
   return c.json({
-    received: { name, email, message }
+    received: { name, email, message },
   })
 })
 ```
@@ -183,16 +186,16 @@ app.post('/contact', async (c) => {
 ```ts
 app.post('/upload', async (c) => {
   const body = await c.req.parseBody()
-  
+
   const file = body['file'] as File
   if (!file) {
     return c.text('No file uploaded', 400)
   }
-  
+
   return c.json({
     filename: file.name,
     size: file.size,
-    type: file.type
+    type: file.type,
   })
 })
 ```
@@ -202,23 +205,23 @@ app.post('/upload', async (c) => {
 ```ts
 app.post('/gallery', async (c) => {
   const body = await c.req.parseBody()
-  
+
   // Files with array notation
   const files = body['images[]'] as File[]
-  
+
   if (!Array.isArray(files)) {
     return c.text('No files uploaded', 400)
   }
-  
-  const fileInfo = files.map(file => ({
+
+  const fileInfo = files.map((file) => ({
     name: file.name,
     size: file.size,
-    type: file.type
+    type: file.type,
   }))
-  
-  return c.json({ 
+
+  return c.json({
     uploadedFiles: fileInfo,
-    count: files.length 
+    count: files.length,
   })
 })
 ```
@@ -229,14 +232,14 @@ app.post('/gallery', async (c) => {
 app.post('/survey', async (c) => {
   // Handle multiple checkboxes with same name
   const body = await c.req.parseBody({ all: true })
-  
+
   const interests = body['interests'] // string | string[]
-  const normalizedInterests = Array.isArray(interests) 
-    ? interests 
+  const normalizedInterests = Array.isArray(interests)
+    ? interests
     : [interests].filter(Boolean)
-  
-  return c.json({ 
-    userInterests: normalizedInterests 
+
+  return c.json({
+    userInterests: normalizedInterests,
   })
 })
 ```
@@ -246,12 +249,12 @@ app.post('/survey', async (c) => {
 ```ts
 app.post('/profile', async (c) => {
   const body = await c.req.parseBody({ dot: true })
-  
+
   // If form data includes: user.name, user.email, address.city, address.zip
   // body will be: { user: { name: '...', email: '...' }, address: { city: '...', zip: '...' } }
-  
+
   return c.json({
-    profile: body
+    profile: body,
   })
 })
 ```
@@ -263,10 +266,10 @@ app.post('/profile', async (c) => {
 ```ts
 app.post('/webhook', async (c) => {
   const payload = await c.req.text()
-  
+
   // Process webhook payload
   console.log('Webhook received:', payload)
-  
+
   return c.text('OK')
 })
 ```
@@ -277,10 +280,10 @@ app.post('/webhook', async (c) => {
 app.post('/binary', async (c) => {
   const buffer = await c.req.arrayBuffer()
   const size = buffer.byteLength
-  
-  return c.json({ 
+
+  return c.json({
     message: 'Binary data received',
-    size 
+    size,
   })
 })
 ```
@@ -290,10 +293,10 @@ app.post('/binary', async (c) => {
 ```ts
 app.post('/media', async (c) => {
   const blob = await c.req.blob()
-  
+
   return c.json({
     type: blob.type,
-    size: blob.size
+    size: blob.size,
   })
 })
 ```
@@ -303,14 +306,14 @@ app.post('/media', async (c) => {
 ```ts
 app.post('/form', async (c) => {
   const formData = await c.req.formData()
-  
+
   // Direct FormData manipulation
   const username = formData.get('username')
   const files = formData.getAll('attachments')
-  
+
   return c.json({
     username,
-    attachmentCount: files.length
+    attachmentCount: files.length,
   })
 })
 ```
@@ -322,9 +325,9 @@ app.post('/form', async (c) => {
 ```ts
 app.get('/debug/*', (c) => {
   return c.json({
-    url: c.req.url,           // Full URL
-    path: c.req.path,         // Path only
-    method: c.req.method,     // HTTP method
+    url: c.req.url, // Full URL
+    path: c.req.path, // Path only
+    method: c.req.method, // HTTP method
   })
 })
 ```
@@ -335,10 +338,10 @@ app.get('/debug/*', (c) => {
 // For platform-specific features
 app.post('/cf-specific', async (c) => {
   const cfData = c.req.raw.cf // Cloudflare-specific data
-  
+
   return c.json({
     country: cfData?.country,
-    city: cfData?.city
+    city: cfData?.city,
   })
 })
 ```
@@ -361,15 +364,15 @@ app.post(
     }
     return {
       title: value['title'],
-      body: value['body']
+      body: value['body'],
     }
   }),
   async (c) => {
     const { title, body } = c.req.valid('form')
-    
+
     return c.json({
       message: 'Post created',
-      post: { title, body }
+      post: { title, body },
     })
   }
 )
@@ -384,15 +387,15 @@ import { zValidator } from '@hono/zod-validator'
 const userSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  age: z.number().optional()
+  age: z.number().optional(),
 })
 
 app.post('/users', zValidator('json', userSchema), async (c) => {
   const user = c.req.valid('json') // Fully typed!
-  
+
   return c.json({
     message: 'User created',
-    user
+    user,
   })
 })
 ```
@@ -405,14 +408,14 @@ app.post('/users', zValidator('json', userSchema), async (c) => {
 app.all('/api/*', async (c) => {
   const method = c.req.method
   const path = c.req.path
-  
+
   if (method === 'OPTIONS') {
     return c.text('', 204, {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     })
   }
-  
+
   // Continue with normal processing
   return c.text(`${method} ${path}`)
 })
@@ -423,19 +426,21 @@ app.all('/api/*', async (c) => {
 ```ts
 app.post('/flexible', async (c) => {
   const contentType = c.req.header('Content-Type')
-  
+
   let data: any
-  
+
   if (contentType?.includes('application/json')) {
     data = await c.req.json()
-  } else if (contentType?.includes('application/x-www-form-urlencoded')) {
+  } else if (
+    contentType?.includes('application/x-www-form-urlencoded')
+  ) {
     data = await c.req.parseBody()
   } else if (contentType?.includes('text/')) {
     data = { text: await c.req.text() }
   } else {
     return c.text('Unsupported content type', 415)
   }
-  
+
   return c.json({ received: data })
 })
 ```

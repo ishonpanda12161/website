@@ -167,8 +167,8 @@ app.get('/profile', (c) => {
 import { Hono } from 'hono'
 import { RegExpRouter } from 'hono/router/reg-exp-router'
 
-const app = new Hono({ 
-  router: new RegExpRouter() 
+const app = new Hono({
+  router: new RegExpRouter(),
 })
 ```
 
@@ -209,7 +209,7 @@ app.use('/api/*', prettyJSON())
 app.get('/api/users', (c) => {
   return c.json([
     { id: 1, name: 'Alice' },
-    { id: 2, name: 'Bob' }
+    { id: 2, name: 'Bob' },
   ])
 })
 ```

@@ -24,12 +24,12 @@ app.all('/ping', (c) => c.text(`${c.req.method} /ping`))
 app.on('PURGE', '/cache', (c) => c.text('Cache purged'))
 
 // Multiple methods for same route
-app.on(['PUT', 'PATCH'], '/users/:id', (c) => 
+app.on(['PUT', 'PATCH'], '/users/:id', (c) =>
   c.text(`${c.req.method} /users/${c.req.param('id')}`)
 )
 
 // Multiple paths for same handler
-app.on('GET', ['/hello', '/hi', '/greetings'], (c) => 
+app.on('GET', ['/hello', '/hi', '/greetings'], (c) =>
   c.text('Hello there!')
 )
 ```
@@ -41,8 +41,8 @@ app.on('GET', ['/hello', '/hi', '/greetings'], (c) =>
 ```ts
 app.get('/users/:id', async (c) => {
   const id = c.req.param('id')
-  return c.json({ 
-    user: { id, name: `User ${id}` }
+  return c.json({
+    user: { id, name: `User ${id}` },
   })
 })
 ```
@@ -52,11 +52,11 @@ app.get('/users/:id', async (c) => {
 ```ts
 app.get('/posts/:id/comments/:commentId', async (c) => {
   const { id, commentId } = c.req.param()
-  
+
   return c.json({
     post: id,
     comment: commentId,
-    url: c.req.url
+    url: c.req.url,
   })
 })
 ```
@@ -67,7 +67,7 @@ app.get('/posts/:id/comments/:commentId', async (c) => {
 // Matches both /api/animals and /api/animals/dogs
 app.get('/api/animals/:type?', (c) => {
   const type = c.req.param('type')
-  
+
   if (type) {
     return c.text(`Showing ${type}`)
   }
@@ -98,15 +98,15 @@ app.get('/api/*/data/*', (c) => {
 // Date format validation: /posts/20240101/my-title
 app.get('/posts/:date{[0-9]+}/:title{[a-z-]+}', async (c) => {
   const { date, title } = c.req.param()
-  
+
   // Validate date format
   if (date.length !== 8) {
     return c.text('Invalid date format', 400)
   }
-  
-  return c.json({ 
-    date, 
-    title: title.replace(/-/g, ' ')
+
+  return c.json({
+    date,
+    title: title.replace(/-/g, ' '),
   })
 })
 ```
@@ -117,10 +117,10 @@ app.get('/posts/:date{[0-9]+}/:title{[a-z-]+}', async (c) => {
 // Match PNG files with paths: /images/photo.png, /images/folder/photo.png
 app.get('/images/:filename{.+\\.png}', async (c) => {
   const filename = c.req.param('filename')
-  
+
   return c.json({
     message: `Serving PNG: ${filename}`,
-    type: 'image/png'
+    type: 'image/png',
   })
 })
 ```
@@ -133,7 +133,9 @@ app.get('/images/:filename{.+\\.png}', async (c) => {
 app
   .get('/users', (c) => c.json({ users: [] }))
   .post((c) => c.json({ message: 'User created' }, 201))
-  .put('/:id', (c) => c.json({ message: `User ${c.req.param('id')} updated` }))
+  .put('/:id', (c) =>
+    c.json({ message: `User ${c.req.param('id')} updated` })
+  )
   .delete('/:id', (c) => c.text('', 204))
 ```
 
@@ -165,8 +167,9 @@ import { Hono } from 'hono'
 // Create a group for book-related routes
 const bookRoutes = new Hono()
 
-bookRoutes.get('/', (c) => c.json({ books: [] }))        // GET /books
-bookRoutes.get('/:id', (c) => {                          // GET /books/:id
+bookRoutes.get('/', (c) => c.json({ books: [] })) // GET /books
+bookRoutes.get('/:id', (c) => {
+  // GET /books/:id
   const id = c.req.param('id')
   return c.json({ book: { id, title: `Book ${id}` } })
 })
@@ -205,12 +208,12 @@ userRoutes.get('/users', (c) => c.json({ users: [] }))
 userRoutes.post('/users', (c) => c.json({ message: 'User created' }))
 
 const postRoutes = new Hono().basePath('/posts')
-postRoutes.get('/', (c) => c.json({ posts: [] }))     // /posts
+postRoutes.get('/', (c) => c.json({ posts: [] })) // /posts
 postRoutes.post('/', (c) => c.json({ message: 'Post created' })) // /posts
 
 const app = new Hono()
-app.route('/', userRoutes)  // Handles /users
-app.route('/', postRoutes)  // Handles /posts
+app.route('/', userRoutes) // Handles /users
+app.route('/', postRoutes) // Handles /posts
 ```
 
 ## Base Path Examples
@@ -220,8 +223,8 @@ app.route('/', postRoutes)  // Handles /posts
 ```ts
 const apiV1 = new Hono().basePath('/api/v1')
 
-apiV1.get('/users', (c) => c.json({ users: [] }))     // /api/v1/users
-apiV1.get('/posts', (c) => c.json({ posts: [] }))     // /api/v1/posts
+apiV1.get('/users', (c) => c.json({ users: [] })) // /api/v1/users
+apiV1.get('/posts', (c) => c.json({ posts: [] })) // /api/v1/posts
 
 const app = new Hono()
 app.route('/', apiV1)
@@ -239,8 +242,8 @@ userService.get('/', (c) => c.json({ users: [] }))
 userService.get('/:id', (c) => c.json({ user: {} }))
 
 const app = new Hono()
-app.route('/', authService)  // /auth/login, /auth/logout
-app.route('/', userService)  // /users, /users/:id
+app.route('/', authService) // /auth/login, /auth/logout
+app.route('/', userService) // /users, /users/:id
 ```
 
 ## Advanced Routing Examples
@@ -252,11 +255,11 @@ const app = new Hono({
   getPath: (req) => req.url.replace(/^https?:\/\/([^?]+).*$/, '$1'),
 })
 
-app.get('/api.example.com/data', (c) => 
+app.get('/api.example.com/data', (c) =>
   c.json({ api: 'v1', data: [] })
 )
 
-app.get('/admin.example.com/dashboard', (c) => 
+app.get('/admin.example.com/dashboard', (c) =>
   c.json({ dashboard: 'admin' })
 )
 ```
@@ -271,7 +274,7 @@ const app = new Hono({
     req.url.replace(/^https?:\/\/[^/]+(\/[^?]*).*/, '$1'),
 })
 
-app.get('/api.example.com/users', (c) => 
+app.get('/api.example.com/users', (c) =>
   c.json({ users: [], host: 'api' })
 )
 
@@ -288,9 +291,9 @@ const app = new Hono({
     const userAgent = req.headers.get('user-agent') || ''
     const isMobile = /Mobile|Android|iPhone/.test(userAgent)
     const prefix = isMobile ? '/mobile' : '/desktop'
-    
+
     return prefix + new URL(req.url).pathname
-  }
+  },
 })
 
 app.get('/mobile/app', (c) => c.text('Mobile app'))
@@ -352,7 +355,7 @@ const three = new Hono()
 three.get('/hi', (c) => c.text('hi'))
 
 const two = new Hono()
-two.route('/three', three)  // Add routes before mounting
+two.route('/three', three) // Add routes before mounting
 
 const app = new Hono()
 app.route('/two', two)
@@ -369,8 +372,8 @@ three.get('/hi', (c) => c.text('hi'))
 const two = new Hono()
 
 const app = new Hono()
-app.route('/two', two)      // ❌ Mounting empty group first
-two.route('/three', three)  // Routes added after mounting
+app.route('/two', two) // ❌ Mounting empty group first
+two.route('/three', three) // Routes added after mounting
 
 // ❌ GET /two/three/hi -> 404 Not Found
 ```
@@ -405,17 +408,21 @@ app.route('/api/protected', protectedAPI)
 ```ts
 const createUserAPI = (version: string) => {
   const api = new Hono()
-  
-  api.get('/users', (c) => c.json({ 
-    version, 
-    users: [] 
-  }))
-  
-  api.get('/users/:id', (c) => c.json({ 
-    version, 
-    user: { id: c.req.param('id') } 
-  }))
-  
+
+  api.get('/users', (c) =>
+    c.json({
+      version,
+      users: [],
+    })
+  )
+
+  api.get('/users/:id', (c) =>
+    c.json({
+      version,
+      user: { id: c.req.param('id') },
+    })
+  )
+
   return api
 }
 
@@ -442,9 +449,11 @@ commentRoutes.post('/', async (c) => {
 
 const postRoutes = new Hono()
 postRoutes.get('/', (c) => c.json({ posts: [] }))
-postRoutes.get('/:id', (c) => c.json({ 
-  post: { id: c.req.param('id') } 
-}))
+postRoutes.get('/:id', (c) =>
+  c.json({
+    post: { id: c.req.param('id') },
+  })
+)
 postRoutes.route('/:postId/comments', commentRoutes)
 
 const app = new Hono()
@@ -452,7 +461,7 @@ app.route('/posts', postRoutes)
 
 // Available routes:
 // GET /posts
-// GET /posts/:id  
+// GET /posts/:id
 // GET /posts/:postId/comments
 // POST /posts/:postId/comments
 ```
@@ -465,19 +474,19 @@ app.route('/posts', postRoutes)
 // Same endpoint, different responses based on Accept header
 app.get('/data', (c) => {
   const accept = c.req.header('Accept')
-  
+
   if (accept?.includes('application/json')) {
     return c.json({ data: [1, 2, 3] })
   } else if (accept?.includes('text/csv')) {
-    return c.text('1,2,3', 200, { 
-      'Content-Type': 'text/csv' 
+    return c.text('1,2,3', 200, {
+      'Content-Type': 'text/csv',
     })
   } else if (accept?.includes('application/xml')) {
-    return c.text('<data>1,2,3</data>', 200, { 
-      'Content-Type': 'application/xml' 
+    return c.text('<data>1,2,3</data>', 200, {
+      'Content-Type': 'application/xml',
     })
   }
-  
+
   return c.json({ data: [1, 2, 3] }) // Default to JSON
 })
 ```
@@ -488,7 +497,7 @@ app.get('/data', (c) => {
 // Routes based on Accept-Language header
 app.get('/welcome', (c) => {
   const acceptLanguage = c.req.header('Accept-Language') || ''
-  
+
   if (acceptLanguage.includes('es')) {
     return c.text('¡Bienvenido!')
   } else if (acceptLanguage.includes('fr')) {
@@ -496,7 +505,7 @@ app.get('/welcome', (c) => {
   } else if (acceptLanguage.includes('ja')) {
     return c.text('いらっしゃいませ!')
   }
-  
+
   return c.text('Welcome!')
 })
 ```
@@ -510,22 +519,22 @@ import { HTTPException } from 'hono/http-exception'
 
 app.get('/users/:id', async (c) => {
   const id = c.req.param('id')
-  
+
   // Validate ID format
   if (!/^\d+$/.test(id)) {
-    throw new HTTPException(400, { 
-      message: 'Invalid user ID format' 
+    throw new HTTPException(400, {
+      message: 'Invalid user ID format',
     })
   }
-  
+
   // Simulate user lookup
   const user = await findUser(parseInt(id))
   if (!user) {
-    throw new HTTPException(404, { 
-      message: 'User not found' 
+    throw new HTTPException(404, {
+      message: 'User not found',
     })
   }
-  
+
   return c.json({ user })
 })
 
@@ -540,21 +549,21 @@ async function findUser(id: number) {
 ```ts
 app.get('/search/:term?', async (c) => {
   const term = c.req.param('term')
-  
+
   if (!term) {
-    return c.json({ 
+    return c.json({
       message: 'No search term provided',
-      suggestions: ['javascript', 'typescript', 'hono']
+      suggestions: ['javascript', 'typescript', 'hono'],
     })
   }
-  
+
   // Simulate search
   const results = await searchFor(term)
-  
+
   return c.json({
     term,
     results,
-    count: results.length
+    count: results.length,
   })
 })
 
@@ -578,10 +587,13 @@ const app = new Hono()
 app.use('*', logger())
 
 // API-specific middleware
-app.use('/api/*', cors({
-  origin: ['https://example.com'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE']
-}))
+app.use(
+  '/api/*',
+  cors({
+    origin: ['https://example.com'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+  })
+)
 
 // Auth middleware for admin routes
 app.use('/admin/*', async (c, next) => {
@@ -605,21 +617,21 @@ function isValidAdminToken(token: string | undefined): boolean {
 ```ts
 app.use('/upload/*', async (c, next) => {
   const contentType = c.req.header('Content-Type')
-  
+
   if (!contentType?.startsWith('multipart/form-data')) {
     return c.text('Only multipart/form-data allowed', 400)
   }
-  
+
   await next()
 })
 
 app.post('/upload/image', async (c) => {
   const body = await c.req.parseBody()
   const file = body['image'] as File
-  
+
   return c.json({
     filename: file.name,
-    size: file.size
+    size: file.size,
   })
 })
 ```
@@ -637,7 +649,7 @@ apiRoutes.get('/users', (c) => c.json({ users: [] }))
 apiRoutes.post('/users', (c) => c.json({ message: 'Created' }))
 apiRoutes.get('/users/:id', (c) => c.json({ user: {} }))
 
-// Post endpoints  
+// Post endpoints
 apiRoutes.get('/posts', (c) => c.json({ posts: [] }))
 apiRoutes.post('/posts', (c) => c.json({ message: 'Created' }))
 apiRoutes.get('/posts/:id', (c) => c.json({ post: {} }))
@@ -670,10 +682,10 @@ const blogAPI = new Hono()
 blogAPI.get('/posts', async (c) => {
   const page = parseInt(c.req.query('page') || '1')
   const limit = parseInt(c.req.query('limit') || '10')
-  
+
   return c.json({
     posts: [],
-    pagination: { page, limit, total: 0 }
+    pagination: { page, limit, total: 0 },
   })
 })
 
@@ -686,9 +698,9 @@ blogAPI.get('/posts/:slug', (c) => {
 blogAPI.get('/categories', (c) => c.json({ categories: [] }))
 blogAPI.get('/categories/:name/posts', (c) => {
   const category = c.req.param('name')
-  return c.json({ 
-    category, 
-    posts: [] 
+  return c.json({
+    category,
+    posts: [],
   })
 })
 
@@ -704,9 +716,9 @@ const storeAPI = new Hono()
 // Products
 storeAPI.get('/products', (c) => {
   const { category, price_min, price_max } = c.req.query()
-  return c.json({ 
+  return c.json({
     products: [],
-    filters: { category, price_min, price_max }
+    filters: { category, price_min, price_max },
   })
 })
 
@@ -719,11 +731,14 @@ storeAPI.get('/products/:id', (c) => {
 storeAPI.get('/cart', (c) => c.json({ items: [] }))
 storeAPI.post('/cart/items', async (c) => {
   const { productId, quantity } = await c.req.json()
-  return c.json({ 
-    message: 'Item added to cart',
-    productId,
-    quantity 
-  }, 201)
+  return c.json(
+    {
+      message: 'Item added to cart',
+      productId,
+      quantity,
+    },
+    201
+  )
 })
 
 // Orders

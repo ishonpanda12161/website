@@ -9,6 +9,7 @@ Context<Env = {}, Variables = {}>
 ```
 
 **Type Parameters:**
+
 - `Env`: Type for environment bindings (e.g., Cloudflare Workers secrets, KV namespaces)
 - `Variables`: Type for per-request variables set via `c.set()`
 
@@ -21,6 +22,7 @@ The enhanced request object for the current request.
 **Type:** [`HonoRequest`](/docs/api/request)
 
 **Example:**
+
 ```ts
 // Access path parameters
 const id = c.req.param('id')
@@ -41,6 +43,7 @@ The underlying response object.
 **Type:** `Response`
 
 **Notes:**
+
 - Generally not used directly; use the helper methods instead
 - Use when you need direct access to the Response object
 
@@ -51,6 +54,7 @@ Access to environment bindings (e.g., Cloudflare Workers KV, secrets).
 **Type:** `Env` (from generic parameter)
 
 **Example:**
+
 ```ts
 // Access a KV namespace
 const value = await c.env.MY_KV.get('key')
@@ -66,6 +70,7 @@ If set, contains an error that occurred during processing.
 **Type:** `Error | undefined`
 
 **Notes:**
+
 - Set automatically by Hono when errors are caught
 - Can be checked in error handling middleware
 
@@ -78,6 +83,7 @@ All response helper methods return either a `Response` or a `Promise<Response>`.
 Send a plain text response.
 
 **Parameters:**
+
 - `body`: `string` - Text content
 - `status` (optional): `number` - HTTP status code (default: 200)
 - `headers` (optional): `Record<string, string> | Headers` - HTTP headers
@@ -85,6 +91,7 @@ Send a plain text response.
 **Returns:** `Response`
 
 **Example:**
+
 ```ts
 return c.text('Hello world', 200, { 'X-Custom-Header': 'value' })
 ```
@@ -94,6 +101,7 @@ return c.text('Hello world', 200, { 'X-Custom-Header': 'value' })
 Send a JSON response.
 
 **Parameters:**
+
 - `body`: `any` - Object to serialize as JSON
 - `status` (optional): `number` - HTTP status code (default: 200)
 - `headers` (optional): `Record<string, string> | Headers` - HTTP headers
@@ -101,10 +109,12 @@ Send a JSON response.
 **Returns:** `Response`
 
 **Notes:**
+
 - Automatically sets `Content-Type: application/json`
 - Automatically serializes the body using `JSON.stringify()`
 
 **Example:**
+
 ```ts
 return c.json({ message: 'Success', data: { id: 123 } })
 ```
@@ -114,6 +124,7 @@ return c.json({ message: 'Success', data: { id: 123 } })
 Send an HTML response.
 
 **Parameters:**
+
 - `body`: `string` - HTML content
 - `status` (optional): `number` - HTTP status code (default: 200)
 - `headers` (optional): `Record<string, string> | Headers` - HTTP headers
@@ -121,9 +132,11 @@ Send an HTML response.
 **Returns:** `Response`
 
 **Notes:**
+
 - Automatically sets `Content-Type: text/html; charset=UTF-8`
 
 **Example:**
+
 ```ts
 return c.html('<h1>Hello world</h1>')
 ```
@@ -133,6 +146,7 @@ return c.html('<h1>Hello world</h1>')
 Send a custom response body.
 
 **Parameters:**
+
 - `body`: `string | ReadableStream | ArrayBuffer | ArrayBufferView | Blob | null` - Response body
 - `status` (optional): `number` - HTTP status code (default: 200)
 - `headers` (optional): `Record<string, string> | Headers` - HTTP headers
@@ -140,6 +154,7 @@ Send a custom response body.
 **Returns:** `Response`
 
 **Notes:**
+
 - Use when other helper methods don't fit your needs
 - More direct access to the Response constructor
 
@@ -150,6 +165,7 @@ Send a 404 Not Found response.
 **Returns:** `Response`
 
 **Notes:**
+
 - Can be customized application-wide using `app.notFound()`
 
 ### `redirect(url, status?)`
@@ -157,12 +173,14 @@ Send a 404 Not Found response.
 Redirect to another URL.
 
 **Parameters:**
+
 - `url`: `string` - URL to redirect to
 - `status` (optional): `number` - HTTP status code (default: 302)
 
 **Returns:** `Response`
 
 **Example:**
+
 ```ts
 return c.redirect('/login')
 return c.redirect('/permanent', 301) // Permanent redirect
@@ -175,11 +193,13 @@ return c.redirect('/permanent', 301) // Permanent redirect
 Set the HTTP status code for the response.
 
 **Parameters:**
+
 - `code`: `number` - HTTP status code
 
 **Returns:** `Context` - The context instance (for chaining)
 
 **Example:**
+
 ```ts
 return c.status(201).json({ created: true })
 ```
@@ -189,14 +209,18 @@ return c.status(201).json({ created: true })
 Set a response header.
 
 **Parameters:**
+
 - `name`: `string` - Header name
 - `value`: `string` - Header value
 
 **Returns:** `Context` - The context instance (for chaining)
 
 **Example:**
+
 ```ts
-return c.header('X-Custom', 'value').text('Response with custom header')
+return c
+  .header('X-Custom', 'value')
+  .text('Response with custom header')
 ```
 
 ## Per-Request Variables
@@ -206,16 +230,19 @@ return c.header('X-Custom', 'value').text('Response with custom header')
 Set a per-request variable.
 
 **Parameters:**
+
 - `key`: `keyof Variables` - Variable name
 - `value`: `Variables[keyof Variables]` - Variable value
 
 **Returns:** `Context` - The context instance (for chaining)
 
 **Notes:**
+
 - Values are retained only within the same request
 - Type-safe when using generics
 
 **Example:**
+
 ```ts
 c.set('user', user)
 ```
@@ -225,11 +252,13 @@ c.set('user', user)
 Get a per-request variable.
 
 **Parameters:**
+
 - `key`: `keyof Variables` - Variable name
 
 **Returns:** `Variables[keyof Variables] | undefined`
 
 **Example:**
+
 ```ts
 const user = c.get('user')
 ```
@@ -241,6 +270,7 @@ Access variables as properties (type-safe).
 **Type:** `Variables`
 
 **Example:**
+
 ```ts
 const user = c.var.user
 ```
@@ -252,11 +282,13 @@ const user = c.var.user
 Set a custom renderer for the response.
 
 **Parameters:**
+
 - `rendererFn`: `ContextRenderer` - Renderer function
 
 **Returns:** `void`
 
 **Notes:**
+
 - Often used in middleware to set up layout templates
 
 ### `render(content, args?)`
@@ -264,12 +296,14 @@ Set a custom renderer for the response.
 Render using the renderer set by `setRenderer`.
 
 **Parameters:**
+
 - `content`: `any` - Content to render
 - `args` (optional): `any` - Additional arguments for the renderer
 
 **Returns:** `Response | Promise<Response>`
 
 **Notes:**
+
 - Must call `setRenderer` first
 - Allows for consistent template/layout usage
 
@@ -282,6 +316,7 @@ Access to Cloudflare's `ExecutionContext`.
 **Type:** `ExecutionContext`
 
 **Notes:**
+
 - Cloudflare Workers specific
 - Used for operations like `waitUntil()`
 
@@ -292,6 +327,7 @@ Access to Cloudflare's `FetchEvent`.
 **Type:** `FetchEvent`
 
 **Notes:**
+
 - **Deprecated** - Use `executionCtx` instead
 - Only available when using Service Worker syntax
 

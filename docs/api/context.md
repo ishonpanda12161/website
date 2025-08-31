@@ -320,3 +320,4 @@ This allows for type-safe access to variables even when they're set by middlewar
 - [HonoRequest](/docs/api/request) - The enhanced request object
 - [Routing](/docs/api/routing) - How routing works in Hono
 - [Exception](/docs/api/exception) - Error handling in Hono
+- [Context Examples](/docs/api/context-examples) - Practical patterns and usage examples

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { glob } from 'node:fs/promises'
+import { glob } from 'glob'
 
 const frontmatterRegex = /^\n*---(\n.+)*?\n---\n/
 

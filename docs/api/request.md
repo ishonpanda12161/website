@@ -1,377 +1,314 @@
-# HonoRequest
+# HonoRequest Specification
 
-The `HonoRequest` is an object that can be taken from `c.req` which wraps a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object.
+The `HonoRequest` class wraps the standard Web API `Request` object with additional convenience methods for common server operations.
 
-## param()
-
-Get the values of path parameters.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-// Captured params
-app.get('/entry/:id', async (c) => {
-  const id = c.req.param('id')
-  //    ^?
-  // ...
-})
-
-// Get all params at once
-app.get('/entry/:id/comment/:commentId', async (c) => {
-  const { id, commentId } = c.req.param()
-  //      ^?
-})
-```
-
-## query()
-
-Get querystring parameters.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-// Query params
-app.get('/search', async (c) => {
-  const query = c.req.query('q')
-  //     ^?
-})
-
-// Get all params at once
-app.get('/search', async (c) => {
-  const { q, limit, offset } = c.req.query()
-  //      ^?
-})
-```
-
-## queries()
-
-Get multiple querystring parameter values, e.g. `/search?tags=A&tags=B`
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/search', async (c) => {
-  // tags will be string[]
-  const tags = c.req.queries('tags')
-  //     ^?
-  // ...
-})
-```
-
-## header()
-
-Get the request header value.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/', (c) => {
-  const userAgent = c.req.header('User-Agent')
-  //      ^?
-  return c.text(`Your user agent is ${userAgent}`)
-})
-```
-
-::: warning
-When `c.req.header()` is called with no arguments, all keys in the returned record are **lowercase**.
-
-If you want to get the value of a header with an uppercase name,
-use `c.req.header(“X-Foo”)`.
+## Type Definition
 
 ```ts
-// ❌ Will not work
-const headerRecord = c.req.header()
-const foo = headerRecord['X-Foo']
-
-// ✅ Will work
-const foo = c.req.header('X-Foo')
+class HonoRequest<ParamKey extends string = string, Input = {}>
 ```
 
-:::
+**Type Parameters:**
+- `ParamKey`: Union type of path parameter names
+- `Input`: Type schema for validated input data
 
-## parseBody()
+**Access:** Available as `c.req` in request handlers and middleware
 
-Parse Request body of type `multipart/form-data` or `application/x-www-form-urlencoded`
+## Parameter Access Methods
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.parseBody()
-  // ...
-})
+### `param()`
+
+Access path parameters captured from the route pattern.
+
+#### `param(key: ParamKey): string | undefined`
+
+Get a specific path parameter.
+
+**Parameters:**
+- `key`: `ParamKey` - Path parameter name from the route pattern
+
+**Returns:** `string | undefined` - Parameter value (URL-decoded) or `undefined` if not found
+
+#### `param(): Record<string, string>`
+
+Get all path parameters as an object.
+
+**Returns:** `Record<string, string>` - All parameters as key-value pairs
+
+**Examples:**
+- Route: `/user/:id` → `param('id')` returns the captured ID
+- Route: `/posts/:postId/comment/:commentId` → `param()` returns both parameters
+
+## Query String Methods
+
+### `query()`
+
+Access URL query parameters.
+
+#### `query(key: string): string | undefined`
+
+Get a specific query parameter.
+
+**Parameters:**
+- `key`: `string` - Query parameter name
+
+**Returns:** `string | undefined` - Parameter value or `undefined` if not present
+
+#### `query(): Record<string, string>`
+
+Get all query parameters as an object.
+
+**Returns:** `Record<string, string>` - All query parameters as key-value pairs
+
+**Behavior:**
+- Multiple values for same key: only the last value is returned
+- Values are URL-decoded automatically
+
+### `queries(key: string): string[] | undefined`
+
+Get all values for a query parameter that appears multiple times.
+
+**Parameters:**
+- `key`: `string` - Query parameter name
+
+**Returns:** `string[] | undefined` - Array of all values or `undefined` if not present
+
+**Use Case:** URLs like `/search?tags=A&tags=B&tags=C`
+
+## Header Access Methods
+
+### `header()`
+
+Access HTTP request headers.
+
+#### `header(name: string): string | undefined`
+
+Get a specific header value.
+
+**Parameters:**
+- `name`: `string` - Header name (case-insensitive)
+
+**Returns:** `string | undefined` - Header value or `undefined` if not present
+
+#### `header(): Record<string, string>`
+
+Get all headers as an object.
+
+**Returns:** `Record<string, string>` - All headers with lowercase keys
+
+**Important:** When called with no arguments, all keys in the returned object are lowercase.
+
+## Body Parsing Methods
+
+### `parseBody(options?)`
+
+Parse form data (multipart/form-data or application/x-www-form-urlencoded).
+
+#### `parseBody(): Promise<Record<string, string | File>>`
+
+Basic form parsing.
+
+**Returns:** `Promise<Record<string, string | File>>` - Parsed form data
+
+#### `parseBody(options: ParseBodyOptions): Promise<Record<string, string | File | (string | File)[]>>`
+
+Advanced form parsing with options.
+
+**Parameters:**
+- `options`: `ParseBodyOptions` - Parsing configuration
+
+**Options:**
+```ts
+type ParseBodyOptions = {
+  all?: boolean    // Handle multiple values for same key
+  dot?: boolean    // Enable dot notation parsing
+}
 ```
 
-`parseBody()` supports the following behaviors.
+**Behaviors:**
+- **Single file**: `body['field']` is `string | File`
+- **Multiple files**: Use `body['field[]']` - always returns `(string | File)[]`
+- **all: true**: Multiple values with same name become arrays
+- **dot: true**: Parse dot notation (`obj.key` becomes nested object)
 
-**Single file**
+### `json<T = any>(): Promise<T>`
 
-```ts twoslash
-import { Context } from 'hono'
-declare const c: Context
-// ---cut---
-const body = await c.req.parseBody()
-const data = body['foo']
-//    ^?
-```
+Parse JSON request body.
 
-`body['foo']` is `(string | File)`.
+**Returns:** `Promise<T>` - Parsed JSON object
 
-If multiple files are uploaded, the last one will be used.
+**Requirements:**
+- Content-Type should be `application/json`
+- Body must contain valid JSON
 
-### Multiple files
+### `text(): Promise<string>`
 
-```ts twoslash
-import { Context } from 'hono'
-declare const c: Context
-// ---cut---
-const body = await c.req.parseBody()
-body['foo[]']
-```
+Parse request body as plain text.
 
-`body['foo[]']` is always `(string | File)[]`.
+**Returns:** `Promise<string>` - Request body as string
 
-`[]` postfix is required.
+**Requirements:**
+- Content-Type should be `text/plain`
 
-### Multiple files or fields with same name
+### `arrayBuffer(): Promise<ArrayBuffer>`
 
-If you have a input field that allows multiple `<input type="file" multiple />` or multiple checkboxes with the same name `<input type="checkbox" name="favorites" value="Hono"/>`.
+Parse request body as ArrayBuffer.
 
-```ts twoslash
-import { Context } from 'hono'
-declare const c: Context
-// ---cut---
-const body = await c.req.parseBody({ all: true })
-body['foo']
-```
+**Returns:** `Promise<ArrayBuffer>` - Binary data as ArrayBuffer
 
-`all` option is disabled by default.
+**Use Cases:**
+- File uploads
+- Binary data processing
+- Raw data handling
 
-- If `body['foo']` is multiple files, it will be parsed to `(string | File)[]`.
-- If `body['foo']` is single file, it will be parsed to `(string | File)`.
+### `blob(): Promise<Blob>`
 
-### Dot notation
+Parse request body as Blob.
 
-If you set the `dot` option `true`, the return value is structured based on the dot notation.
+**Returns:** `Promise<Blob>` - Request body as Blob object
 
-Imagine receiving the following data:
+**Properties Available:**
+- `blob.size`: Size in bytes
+- `blob.type`: MIME type
 
-```ts twoslash
-const data = new FormData()
-data.append('obj.key1', 'value1')
-data.append('obj.key2', 'value2')
-```
+### `formData(): Promise<FormData>`
 
-You can get the structured value by setting the `dot` option `true`:
+Parse request body as FormData.
 
-```ts twoslash
-import { Context } from 'hono'
-declare const c: Context
-// ---cut---
-const body = await c.req.parseBody({ dot: true })
-// body is `{ obj: { key1: 'value1', key2: 'value2' } }`
-```
+**Returns:** `Promise<FormData>` - Native FormData object
 
-## json()
+**Use Cases:**
+- Direct FormData manipulation
+- Access to FormData methods (entries(), keys(), values())
 
-Parses the request body of type `application/json`
+## Validation Methods
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.json()
-  // ...
-})
-```
+### `valid(target: ValidTargets): any`
 
-## text()
+Access validated data from validation middleware.
 
-Parses the request body of type `text/plain`
+**Parameters:**
+- `target`: `ValidTargets` - Data source to validate
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.text()
-  // ...
-})
-```
+**Valid Targets:**
+- `'form'` - Form data validation
+- `'json'` - JSON body validation
+- `'query'` - Query parameter validation
+- `'header'` - Header validation
+- `'cookie'` - Cookie validation
+- `'param'` - Path parameter validation
 
-## arrayBuffer()
+**Returns:** Validated data with appropriate typing based on validation schema
 
-Parses the request body as an `ArrayBuffer`
+**Requirements:**
+- Validation middleware must be applied before using this method
+- See [Validation Guide](/docs/guides/validation) for setup details
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.arrayBuffer()
-  // ...
-})
-```
+## Request Metadata Properties
 
-## blob()
+### `path: string`
 
-Parses the request body as a `Blob`.
+The pathname portion of the request URL.
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.blob()
-  // ...
-})
-```
+**Example:** For URL `https://example.com/api/users?page=1`, `path` is `/api/users`
 
-## formData()
+### `url: string`
 
-Parses the request body as a `FormData`.
+The complete request URL.
 
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.post('/entry', async (c) => {
-  const body = await c.req.formData()
-  // ...
-})
-```
+**Example:** `https://example.com/api/users?page=1`
 
-## valid()
+### `method: string`
 
-Get the validated data.
+The HTTP method of the request.
+
+**Example:** `'GET'`, `'POST'`, `'PUT'`, `'DELETE'`, etc.
+
+### `raw: Request`
+
+The underlying Web API Request object.
+
+**Use Cases:**
+- Platform-specific features (e.g., Cloudflare Workers `cf` object)
+- Direct access to Request methods not wrapped by HonoRequest
+- Advanced request inspection
+
+## Deprecated Properties
+
+### `routePath` *(Deprecated)*
+
+**Status:** Deprecated in v4.8.0 - Use `routePath()` from [Route Helper](/docs/helpers/route)
+
+The registered route pattern for the current route.
+
+### `matchedRoutes` *(Deprecated)*
+
+**Status:** Deprecated in v4.8.0 - Use `matchedRoutes()` from [Route Helper](/docs/helpers/route)
+
+Array of all matched routes for debugging purposes.
+
+## Type Safety
+
+### Parameter Typing
+
+When using TypeScript with typed routes:
 
 ```ts
-app.post('/posts', async (c) => {
-  const { title, body } = c.req.valid('form')
-  // ...
+app.get('/user/:id', (c) => {
+  const id = c.req.param('id') // Type: string | undefined
+  //    ^? string | undefined
 })
 ```
 
-Available targets are below.
+### Input Validation Typing
 
-- `form`
-- `json`
-- `query`
-- `header`
-- `cookie`
-- `param`
-
-See the [Validation section](/docs/guides/validation) for usage examples.
-
-## routePath
-
-::: warning
-**Deprecated in v4.8.0**: This property is deprecated. Use `routePath()` from [Route Helper](/docs/helpers/route) instead.
-:::
-
-You can retrieve the registered path within the handler like this:
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/posts/:id', (c) => {
-  return c.json({ path: c.req.routePath })
-})
-```
-
-If you access `/posts/123`, it will return `/posts/:id`:
-
-```json
-{ "path": "/posts/:id" }
-```
-
-## matchedRoutes
-
-::: warning
-**Deprecated in v4.8.0**: This property is deprecated. Use `matchedRoutes()` from [Route Helper](/docs/helpers/route) instead.
-:::
-
-It returns matched routes within the handler, which is useful for debugging.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.use(async function logger(c, next) {
-  await next()
-  c.req.matchedRoutes.forEach(({ handler, method, path }, i) => {
-    const name =
-      handler.name ||
-      (handler.length < 2 ? '[handler]' : '[middleware]')
-    console.log(
-      method,
-      ' ',
-      path,
-      ' '.repeat(Math.max(10 - path.length, 0)),
-      name,
-      i === c.req.routeIndex ? '<- respond from here' : ''
-    )
-  })
-})
-```
-
-## path
-
-The request pathname.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/about/me', async (c) => {
-  const pathname = c.req.path // `/about/me`
-  // ...
-})
-```
-
-## url
-
-The request url strings.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/about/me', async (c) => {
-  const url = c.req.url // `http://localhost:8787/about/me`
-  // ...
-})
-```
-
-## method
-
-The method name of the request.
-
-```ts twoslash
-import { Hono } from 'hono'
-const app = new Hono()
-// ---cut---
-app.get('/about/me', async (c) => {
-  const method = c.req.method // `GET`
-  // ...
-})
-```
-
-## raw
-
-The raw [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) object.
+With validation middleware:
 
 ```ts
-// For Cloudflare Workers
-app.post('/', async (c) => {
-  const metadata = c.req.raw.cf?.hostMetadata?
-  // ...
+type UserInput = {
+  name: string
+  email: string
+}
+
+app.post('/user', validator('json', schema), (c) => {
+  const { name, email } = c.req.valid('json') // Type: UserInput
+  //      ^? UserInput
 })
 ```
+
+## Error Handling
+
+### Parsing Errors
+
+All body parsing methods can throw errors:
+
+- **JSON parsing**: Invalid JSON syntax
+- **Form parsing**: Malformed form data
+- **Binary parsing**: Stream reading errors
+
+### Best Practices
+
+```ts
+app.post('/api', async (c) => {
+  try {
+    const body = await c.req.json()
+    // Process body
+  } catch (error) {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+})
+```
+
+## Performance Considerations
+
+- **Body parsing**: Each parsing method consumes the request body stream
+- **Multiple calls**: Don't call multiple body parsing methods on the same request
+- **Large uploads**: Consider streaming for large file uploads
+- **Header access**: `header()` with specific name is more efficient than `header()`
+
+## See Also
+
+- [HonoRequest Examples](/docs/api/request-examples) - Practical usage examples and patterns
+- [Context Specification](/docs/api/context) - Context object containing HonoRequest
+- [Validation Guide](/docs/guides/validation) - Request validation patterns
+- [Routing Specification](/docs/api/routing) - Route patterns and parameter capture
